@@ -106,8 +106,6 @@ select option{background:var(--sur2)}
 .ss-tag{display:inline-block;font-size:10px;padding:2px 7px;border:1px solid currentColor;letter-spacing:.5px;margin-bottom:2px;border-radius:2px}
 .ss-sub{font-size:9px;color:var(--dim);display:block}
 .pt .col-il{background:rgba(201,168,76,.05)}
-.jjg-wrap{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:3px}
-.jjg-b{font-size:8px;padding:1px 4px;border:1px solid var(--bdr);color:var(--dim)}
 
 /* 오행 분포 */
 .od{display:flex;flex-direction:column;gap:8px}
@@ -715,7 +713,7 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
   }
 
   // ━━ 원국표 ━━
-  // 행 구성: 십신(천간) / 천간 / 십신(지지) / 지지 / 지장간
+  // 행 구성: 십신(천간) / 천간 / 십신(지지) / 지지
   // 일주 열은 황금 배경 강조
 
   let t = `<table class="pt">`;
@@ -781,26 +779,7 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
   });
   t += `</tr>`;
 
-  // ⑤ 지장간 (정기 위주, 미니 뱃지)
-  t += `<tr><td class="row-lbl" style="font-size:9px">지장간</td>`;
-  colDefs.forEach(c => {
-    const isIl  = c.key === 'ilju';
-    const jiKey = c.p.ji;
-    const jjg   = SajuEngine.JIJANGGAN[jiKey] || [];
-    const badges = jjg.map(item => {
-      const oh  = SajuEngine.CHEONGAN_OHENG[item.gan];
-      const col = OHC[oh];
-      const ss  = stemSS(item.stemIdx);
-      return `<span class="jjg-b" style="border-color:${col};color:${col}" title="${ss}">${item.ganHJ}<span style="color:var(--dim)">${item.type==='j'?'●':item.type==='m'?'◑':'○'}</span></span>`;
-    }).join('');
-    t += `<td${isIl?' class="col-il"':''}><div class="jjg-wrap">${badges}</div></td>`;
-  });
-  t += `</tr>`;
-
   t += `</table>`;
-
-  // 지장간 범례
-  t += `<div style="font-size:9px;color:var(--dim);margin-bottom:10px;letter-spacing:.3px">● 정기 &nbsp;◑ 중기 &nbsp;○ 여기 &nbsp;|&nbsp; 뱃지 hover 시 십신 표시</div>`;
 
   if (lunarMsg) t += `<div class="lunar-w">${lunarMsg}</div>`;
   document.getElementById('oSaju').innerHTML = t;
