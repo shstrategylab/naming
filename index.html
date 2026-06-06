@@ -123,6 +123,7 @@ select option{background:var(--sur2)}
 .yst{font-size:9px;letter-spacing:3px;color:var(--mut);margin-bottom:3px}
 .ysn{font-size:15px;font-family:'Noto Serif KR',serif;margin-bottom:4px}
 .ysd{font-size:11px;color:var(--mut);line-height:1.6}
+.ys-reason{margin-top:6px;padding:5px 8px;background:rgba(255,180,0,.10);border-left:3px solid #f0a500;border-radius:3px;color:#b07800;font-size:10.5px;line-height:1.5}
 .lunar-w{margin-top:9px;padding:8px 12px;background:rgba(201,168,76,.06);border:1px solid var(--goldd);font-size:10px;color:var(--goldd);line-height:1.6}
 
 /* 이름 목록 */
@@ -823,6 +824,9 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
   const ysInfo = ana.yongsin.yongsin.map(v=>`${v.oh}(${OHJ[v.oh]}) — ${v.ss}`).join(', ');
   const heesinInfo = ana.yongsin.heesin?.map(v=>`${v.oh}(${OHJ[v.oh]})`).join(', ') || '';
   const gisinInfo  = ana.yongsin.gisin?.map(v=>`${v.oh}(${OHJ[v.oh]})`).join(', ')  || '';
+  const reasonHtml = ana.yongsin.reason
+    ? `<div class="ys-reason">⚠️ ${ana.yongsin.reason}</div>`
+    : '';
 
   d += `<div class="ysbox">
     <div class="ysc" style="color:${ysCol}">${yongsinJW}</div>
@@ -835,6 +839,7 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
         ${heesinInfo ? `희신: <span style="color:var(--mut)">${heesinInfo}</span> &nbsp;·&nbsp; ` : ''}
         ${gisinInfo  ? `기신: <span style="color:var(--bad)">${gisinInfo}</span><br>` : ''}
         이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충하여 사주 균형을 맞춥니다.
+        ${reasonHtml}
       </div>
     </div>
   </div>`;
