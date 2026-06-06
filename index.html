@@ -3,638 +3,745 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>사주 기반 작명 시스템</title>
-<link rel="stylesheet" href="css/style.css">
-<script src="js/manseryok.js"></script>
-<script src="js/saju-engine.js"></script>
-<script src="js/naming-db.js"></script>
-<script src="js/naming-engine.js"></script>
+<title>사주 작명</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;900&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+
+<!-- 로드 순서 중요: manseryok → saju-engine → db_saju → db_hanja → jawon_ohaeng_db -->
+<script src="manseryok.js"></script>
+<script src="saju-engine.js"></script>
+<script src="db_saju.js"></script>
+<script src="db_hanja.js"></script>
+<script src="jawon_ohaeng_db.js"></script>
+
+<style>
+:root{
+  --bg:#0d0d0f;--sur:#13141a;--sur2:#1a1c24;--bdr:#252830;
+  --txt:#e8e4dc;--mut:#7a7680;--dim:#4a4852;
+  --gold:#c9a84c;--goldl:#e2c47a;--goldd:#7a6230;
+  --木:#4aab6d;--火:#e05a3a;--土:#c8893c;--金:#9aafcc;--水:#5b9fd4;
+  --great:#c9a84c;--good:#4aab6d;--neu:#9aafcc;--bad:#e05a3a;--terrible:#c02020;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--txt);font-family:'Noto Sans KR',sans-serif;font-weight:300;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(circle at 20% 50%,rgba(201,168,76,.04),transparent 50%),radial-gradient(circle at 80% 20%,rgba(91,159,212,.04),transparent 50%);pointer-events:none;z-index:0}
+.w{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:0 20px}
+
+/* 헤더 */
+header{padding:54px 0 34px;text-align:center;border-bottom:1px solid var(--bdr);position:relative}
+header::after{content:'';position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:100px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.badge{font-size:10px;letter-spacing:3px;color:var(--gold);border:1px solid var(--goldd);padding:4px 12px;display:inline-block;margin-bottom:12px}
+h1{font-family:'Noto Serif KR',serif;font-weight:900;font-size:clamp(24px,5vw,44px);letter-spacing:-1px}
+h1 em{color:var(--gold);font-style:normal}
+.sub{margin-top:9px;color:var(--mut);font-size:12px;letter-spacing:.5px}
+
+/* 단계 */
+.steps{display:flex;align-items:center;justify-content:center;padding:26px 0}
+.st{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);transition:color .3s}
+.st.active{color:var(--gold)}.st.done{color:var(--mut)}
+.sn{width:21px;height:21px;border:1px solid currentColor;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
+.st.active .sn{background:var(--gold);border-color:var(--gold);color:var(--bg)}
+.st.done .sn{background:var(--mut);border-color:var(--mut);color:var(--bg)}
+.sl{width:32px;height:1px;background:var(--bdr);margin:0 4px}
+@media(max-width:460px){.st span:not(.sn){display:none}.sl{width:18px}}
+
+/* 카드 */
+.card{background:var(--sur);border:1px solid var(--bdr);padding:26px;margin-bottom:16px;animation:fu .35s ease both}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.ct{font-family:'Noto Serif KR',serif;font-size:11px;letter-spacing:3px;color:var(--gold);margin-bottom:20px;display:flex;align-items:center;gap:9px}
+.ct::after{content:'';flex:1;height:1px;background:var(--bdr)}
+
+/* 폼 */
+.fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:13px}
+.fi{display:flex;flex-direction:column;gap:6px}
+.fi.full{grid-column:1/-1}
+label{font-size:10px;letter-spacing:1.5px;color:var(--mut);text-transform:uppercase}
+.ln{font-size:9px;color:var(--dim);letter-spacing:.3px;text-transform:none;margin-left:3px}
+input,select{background:var(--bg);border:1px solid var(--bdr);color:var(--txt);padding:10px 12px;font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none;width:100%}
+input:focus,select:focus{border-color:var(--goldd)}
+input::placeholder{color:var(--dim)}
+select option{background:var(--sur2)}
+.r2{display:flex;gap:6px}
+.tb{flex:1;padding:9px 5px;background:var(--bg);border:1px solid var(--bdr);color:var(--mut);cursor:pointer;font-size:12px;font-family:'Noto Sans KR',sans-serif;transition:all .2s;text-align:center}
+.tb.on{background:var(--sur2);border-color:var(--goldd);color:var(--gold)}
+
+/* 성씨 AC */
+.acw{position:relative}
+.acl{position:absolute;top:100%;left:0;right:0;background:var(--sur2);border:1px solid var(--goldd);z-index:50;display:none;max-height:180px;overflow-y:auto}
+.aci{padding:8px 12px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;transition:background .15s}
+.aci:hover{background:rgba(201,168,76,.1)}
+.acs{font-size:10px;color:var(--gold)}
+.sh{font-size:10px;color:var(--gold);min-height:13px;margin-top:2px}
+
+/* 지지 시각 */
+.hg{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:9px}
+@media(max-width:500px){.hg{grid-template-columns:repeat(4,1fr)}}
+.hb{background:var(--bg);border:1px solid var(--bdr);color:var(--mut);padding:7px 2px;text-align:center;cursor:pointer;transition:all .2s;font-family:'Noto Sans KR',sans-serif;line-height:1.3}
+.hb:hover{border-color:var(--goldd);color:var(--txt)}
+.hb.on{background:rgba(201,168,76,.07);border-color:var(--gold);color:var(--gold)}
+.hbj{font-family:'Noto Serif KR',serif;font-size:13px;font-weight:600;display:block}
+.hbh{font-size:9px;color:var(--goldd);display:block}
+.hbt{font-size:8px;color:var(--dim);display:block;margin-top:1px}
+.hb.on .hbh{color:var(--gold)}
+.hb.none-b{grid-column:span 2;font-size:11px}
+.hr{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.hr input{width:68px}
+#hlbl{font-size:11px;color:var(--gold)}
+
+/* 버튼 */
+.bmain{display:block;width:100%;padding:14px;background:transparent;border:1px solid var(--goldd);color:var(--gold);font-size:12px;font-family:'Noto Serif KR',serif;letter-spacing:4px;cursor:pointer;transition:all .3s;margin-top:20px;position:relative;overflow:hidden}
+.bmain::before{content:'';position:absolute;inset:0;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .3s;z-index:0}
+.bmain:hover::before{transform:scaleX(1)}
+.bmain:hover{color:var(--bg)}
+.bmain span{position:relative;z-index:1}
+.breset{background:transparent;border:1px solid var(--bdr);color:var(--mut);padding:8px 16px;font-size:11px;font-family:'Noto Sans KR',sans-serif;letter-spacing:1.5px;cursor:pointer;transition:all .2s}
+.breset:hover{border-color:var(--mut);color:var(--txt)}
+
+/* 사주 원국표 */
+.pt{width:100%;border-collapse:collapse;text-align:center;font-family:'Noto Serif KR',serif;margin-bottom:18px}
+.pt th{padding:8px 5px;font-size:10px;letter-spacing:2px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--bdr)}
+.pt td{padding:10px 5px;border-bottom:1px solid var(--bdr)}
+.pb{font-size:24px;font-weight:600;line-height:1;display:block}
+.ps{font-size:10px;color:var(--mut);display:block;margin-top:3px}
+
+/* 오행 분포 */
+.od{display:flex;flex-direction:column;gap:8px}
+.or{display:flex;align-items:center;gap:10px}
+.ol{font-size:11px;width:44px;flex-shrink:0;font-family:'Noto Serif KR',serif}
+.obg{flex:1;height:5px;background:var(--bdr);overflow:hidden}
+.obf{height:100%;transition:width .6s ease}
+.oc{font-size:11px;color:var(--mut);width:16px;text-align:right;flex-shrink:0}
+
+/* 용신 */
+.ysbox{display:flex;align-items:center;gap:13px;padding:16px;background:var(--bg);border:1px solid var(--bdr);margin-top:16px}
+.ysc{font-family:'Noto Serif KR',serif;font-size:36px;font-weight:900;line-height:1;flex-shrink:0}
+.yst{font-size:9px;letter-spacing:3px;color:var(--mut);margin-bottom:3px}
+.ysn{font-size:15px;font-family:'Noto Serif KR',serif;margin-bottom:4px}
+.ysd{font-size:11px;color:var(--mut);line-height:1.6}
+.lunar-w{margin-top:9px;padding:8px 12px;background:rgba(201,168,76,.06);border:1px solid var(--goldd);font-size:10px;color:var(--goldd);line-height:1.6}
+
+/* 이름 목록 */
+.rh{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;margin-bottom:18px}
+.fr{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.fb{padding:5px 12px;background:var(--bg);border:1px solid var(--bdr);color:var(--mut);font-size:10px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .2s;letter-spacing:1px}
+.fb.on{border-color:var(--goldd);color:var(--gold);background:rgba(201,168,76,.05)}
+.si{font-size:10px;color:var(--dim);letter-spacing:.5px;margin-bottom:12px}
+.ng{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.nc{background:var(--bg);border:1px solid var(--bdr);padding:16px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.nc:hover{border-color:var(--goldd);transform:translateY(-2px)}
+.nc::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--gold);transform:scaleY(0);transform-origin:bottom;transition:transform .2s}
+.nc:hover::before{transform:scaleY(1)}
+.nk{font-family:'Noto Serif KR',serif;font-size:22px;font-weight:600;letter-spacing:2px;margin-bottom:2px;display:flex;align-items:baseline;gap:6px}
+.nh{font-size:12px;color:var(--mut);font-weight:300}
+.nfull{font-size:10px;color:var(--dim);margin-bottom:7px}
+.nbs{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.ob{display:inline-flex;padding:2px 6px;font-size:9px;font-weight:500;border:1px solid currentColor;letter-spacing:.5px}
+.ob-木{color:var(--木);border-color:rgba(74,171,109,.4);background:rgba(74,171,109,.07)}
+.ob-火{color:var(--火);border-color:rgba(224,90,58,.4);background:rgba(224,90,58,.07)}
+.ob-土{color:var(--土);border-color:rgba(200,137,60,.4);background:rgba(200,137,60,.07)}
+.ob-金{color:var(--金);border-color:rgba(154,175,204,.4);background:rgba(154,175,204,.07)}
+.ob-水{color:var(--水);border-color:rgba(91,159,212,.4);background:rgba(91,159,212,.07)}
+.sr{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:9px}
+.sc{background:var(--sur2);padding:5px 2px;text-align:center}
+.scl{font-size:8px;color:var(--dim);display:block}
+.scn{font-size:14px;font-family:'Noto Serif KR',serif;display:block}
+.sck{font-size:8px;display:block}
+.lg-great{color:var(--great)}.lg-good{color:var(--good)}.lg-neutral{color:var(--neu)}.lg-bad{color:var(--bad)}.lg-terrible{color:var(--terrible)}
+
+/* 로딩/빈상태 */
+.ld{text-align:center;padding:55px 20px;color:var(--mut)}
+.sp{width:36px;height:36px;border:2px solid var(--bdr);border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 13px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.emp{text-align:center;padding:55px 20px;color:var(--mut)}
+.emc{font-family:'Noto Serif KR',serif;font-size:52px;opacity:.1;display:block;margin-bottom:12px}
+
+/* 모달 */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:14px;animation:fi .2s ease}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+.modal{background:var(--sur);border:1px solid var(--bdr);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;animation:su .25s ease}
+@keyframes su{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mhd{padding:20px 24px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:flex-start;justify-content:space-between}
+.mnb{font-family:'Noto Serif KR',serif;font-size:36px;font-weight:900;letter-spacing:4px}
+.mhb{font-size:16px;color:var(--mut);letter-spacing:3px;margin-top:2px;font-family:'Noto Serif KR',serif}
+.mcl{background:none;border:1px solid var(--bdr);color:var(--mut);width:28px;height:28px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.mcl:hover{border-color:var(--mut);color:var(--txt)}
+.mb{padding:20px 24px}
+.ms{margin-bottom:20px}
+.mst{font-size:9px;letter-spacing:3px;color:var(--gold);margin-bottom:9px;text-transform:uppercase}
+.hjg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hji{background:var(--bg);border:1px solid var(--bdr);padding:12px;display:flex;gap:10px;align-items:flex-start}
+.hjb{font-size:28px;font-family:'Noto Serif KR',serif;flex-shrink:0}
+.hji-t{font-size:11px;color:var(--mut);line-height:1.65}
+.hji-t strong{color:var(--txt);font-weight:500}
+.sgg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sgi{background:var(--bg);border:1px solid var(--bdr);padding:12px}
+.sgl{font-size:9px;letter-spacing:1.5px;color:var(--dim);margin-bottom:4px}
+.sgn{font-family:'Noto Serif KR',serif;font-size:24px;font-weight:600}
+.sgm{font-size:10px;color:var(--mut);margin-top:4px;line-height:1.5}
+.ef{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.efe{font-size:10px;padding:2px 6px;border:1px solid currentColor;display:inline-block}
+.efa{color:var(--dim);font-size:10px}
+.efd{font-size:10px;color:var(--mut);margin:2px 0;line-height:1.5}
+
+/* 토글 */
+.hide{display:none}.show{display:block;animation:fu .3s ease}
+</style>
 </head>
 <body>
-<div class="app">
+<div class="w">
 
-  <!-- ── 헤더 ─────────────────────────────────────────── -->
-  <header class="app-header">
-    <div class="app-title">사주 기반 작명 시스템</div>
-    <div class="app-sub">생년월일시 사주 분석 → 용신 도출 → 자원·음령·수리 종합 작명</div>
-  </header>
+<header>
+  <div class="badge">사주작명 · 오행이름</div>
+  <h1>사주(四柱)로 짓는 <em>좋은 이름</em></h1>
+  <p class="sub">만세력 정밀 계산 → 용신 도출 → 수리오행 4격 검증</p>
+</header>
 
-  <!-- ── 스텝 바 ───────────────────────────────────────── -->
-  <div class="step-bar">
-    <button class="step-btn active" id="tab1" onclick="goTab(1)">① 사주 입력</button>
-    <button class="step-btn" id="tab2" onclick="goTab(2)">② 사주 분석</button>
-    <button class="step-btn" id="tab3" onclick="goTab(3)">③ 이름 추천</button>
-    <button class="step-btn" id="tab4" onclick="goTab(4)">④ 상세 검수</button>
+<div class="steps">
+  <div class="st active" id="s1"><span class="sn">1</span><span>정보입력</span></div>
+  <div class="sl"></div>
+  <div class="st" id="s2"><span class="sn">2</span><span>사주분석</span></div>
+  <div class="sl"></div>
+  <div class="st" id="s3"><span class="sn">3</span><span>이름추천</span></div>
+</div>
+
+<!-- 입력 -->
+<div id="sInput" class="show">
+<div class="card">
+<div class="ct">생년월일시 입력</div>
+<div class="fg">
+
+  <div class="fi acw">
+    <label>성씨 (한글)</label>
+    <input type="text" id="iS" placeholder="김, 이, 박…" maxlength="2" autocomplete="off"
+           oninput="onSI()" onblur="hideAC()">
+    <div class="acl" id="acl"></div>
   </div>
 
-  <!-- ════════════════════════════════════════
-       PAGE 1 — 사주 입력
-  ════════════════════════════════════════ -->
-  <div id="page1">
+  <div class="fi">
+    <label>성씨 한자 획수<span class="ln">漢字 기준</span></label>
+    <input type="number" id="iStr" min="1" max="40" placeholder="金→8  李→7  朴→6">
+    <div class="sh" id="shint"></div>
+  </div>
 
-    <div class="card">
-      <div class="card-title">📅 생년월일시</div>
-      <div class="row2">
-        <div>
-          <label class="label">양력 / 음력</label>
-          <select id="calType">
-            <option value="solar">양력 (기본)</option>
-            <option value="lunar">음력 (참고용)</option>
-          </select>
-        </div>
-        <div>
-          <label class="label">성별</label>
-          <select id="gender">
-            <option value="M">남성</option>
-            <option value="F">여성</option>
-          </select>
-        </div>
-      </div>
-      <div class="row3">
-        <div>
-          <label class="label">년도</label>
-          <input type="number" id="year" value="1990" min="1930" max="2030">
-        </div>
-        <div>
-          <label class="label">월</label>
-          <input type="number" id="month" value="5" min="1" max="12">
-        </div>
-        <div>
-          <label class="label">일</label>
-          <input type="number" id="day" value="15" min="1" max="31">
-        </div>
-      </div>
-      <div class="row2">
-        <div>
-          <label class="label">출생 시각 (0~23시, 모르면 비워두세요)</label>
-          <input type="number" id="hour" value="" min="0" max="23" placeholder="시각 미상이면 공백">
-        </div>
-        <div></div>
-      </div>
-      <div id="lunarWarn" class="warn-box hidden">
-        음력은 양력으로 변환 후 입력해야 절기 계산이 정확합니다.
-        <a href="https://search.naver.com/search.naver?query=음력+양력+변환" target="_blank" style="color:inherit;text-decoration:underline">변환 바로가기 ↗</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🔤 성씨 및 이름 조건</div>
-      <div class="row2">
-        <div>
-          <label class="label">성씨 (한글)</label>
-          <input type="text" id="surname" value="김" maxlength="2" placeholder="예: 김, 남궁">
-        </div>
-        <div>
-          <label class="label">성씨 한자 획수 <span style="color:var(--c-text3);font-size:11px">(자동 계산, 수정 가능)</span></label>
-          <div class="stroke-input">
-            <input type="number" id="surnameStroke" value="8" min="1" max="30">
-            <span class="stroke-hint" id="strokeHint">김(金) = 8획</span>
-          </div>
-        </div>
-      </div>
-      <div class="row2">
-        <div>
-          <label class="label">이름 글자 수</label>
-          <select id="nameLen">
-            <option value="2">두 글자</option>
-            <option value="1">한 글자</option>
-          </select>
-        </div>
-        <div></div>
-      </div>
-      <div class="field">
-        <label class="label">강조하고 싶은 운 (복수 선택)</label>
-        <div class="fortune-grid" id="fortuneGrid">
-          <label class="fortune-check checked"><input type="checkbox" value="재물" checked>💰 재물운</label>
-          <label class="fortune-check"><input type="checkbox" value="건강">💪 건강운</label>
-          <label class="fortune-check"><input type="checkbox" value="학업">📚 학업운</label>
-          <label class="fortune-check"><input type="checkbox" value="명예">🏆 명예운</label>
-          <label class="fortune-check"><input type="checkbox" value="인간관계">🤝 인간관계운</label>
-        </div>
-      </div>
-    </div>
-
-    <div class="flex-end">
-      <button class="btn btn-primary" onclick="doAnalyze()">사주 분석하기 →</button>
+  <div class="fi">
+    <label>성별</label>
+    <div class="r2">
+      <button class="tb on" id="gM" onclick="setG('M')">男 남자</button>
+      <button class="tb"    id="gF" onclick="setG('F')">女 여자</button>
     </div>
   </div>
 
-  <!-- ════════════════════════════════════════
-       PAGE 2 — 사주 분석
-  ════════════════════════════════════════ -->
-  <div id="page2" class="hidden">
-    <div id="analyzeResult"></div>
-    <div class="flex-end">
-      <button class="btn" onclick="goTab(1)">← 다시 입력</button>
-      <button class="btn btn-primary" onclick="doGenNames()">이름 추천받기 →</button>
+  <div class="fi">
+    <label>양력 / 음력</label>
+    <div class="r2">
+      <button class="tb on" id="cS" onclick="setC('solar')">☀ 양력</button>
+      <button class="tb"    id="cL" onclick="setC('lunar')">☾ 음력</button>
     </div>
   </div>
 
-  <!-- ════════════════════════════════════════
-       PAGE 3 — 이름 추천
-  ════════════════════════════════════════ -->
-  <div id="page3" class="hidden">
-    <div id="nameResult"></div>
-    <div class="flex-end">
-      <button class="btn" onclick="goTab(2)">← 분석으로</button>
+  <div class="fi" id="lpG" style="display:none">
+    <label>윤달</label>
+    <div class="r2">
+      <button class="tb on" id="lpN" onclick="setL(false)">일반달</button>
+      <button class="tb"    id="lpY" onclick="setL(true)">윤달</button>
     </div>
   </div>
 
-  <!-- ════════════════════════════════════════
-       PAGE 4 — 상세 검수
-  ════════════════════════════════════════ -->
-  <div id="page4" class="hidden">
-    <div id="detailResult"></div>
-    <div class="flex-end">
-      <button class="btn" onclick="goTab(3)">← 이름 목록</button>
+  <div class="fi">
+    <label>출생 연도</label>
+    <input type="number" id="iY" placeholder="예: 1990" min="1900" max="2030">
+  </div>
+
+  <div class="fi">
+    <label>출생 월</label>
+    <select id="iM">
+      <option value="">월 선택</option>
+      <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
+      <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
+      <option value="7">7월</option><option value="8">8월</option><option value="9">9월</option>
+      <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+    </select>
+  </div>
+
+  <div class="fi">
+    <label>출생 일</label>
+    <input type="number" id="iD" placeholder="예: 15" min="1" max="31">
+  </div>
+
+  <div class="fi full">
+    <label>출생 시각 — 지지(地支) 기준<span class="ln">모르면 '모름' 선택</span></label>
+    <div class="hg" id="hg"></div>
+    <div class="hr">
+      <span style="font-size:10px;color:var(--dim)">숫자 직접 입력:</span>
+      <input type="number" id="iHR" placeholder="0~23" min="0" max="23" oninput="syncHR(this.value)">
+      <span style="font-size:10px;color:var(--dim)">시 →</span>
+      <span id="hlbl">—</span>
     </div>
   </div>
 
-</div><!-- /.app -->
+</div>
+<button class="bmain" onclick="run()"><span>✦ 사주 분석 · 이름 추천받기</span></button>
+</div>
+</div>
+
+<!-- 사주 분석 -->
+<div id="sSaju" class="hide">
+  <div class="card"><div class="ct">사주원국 (四柱原局)</div><div id="oSaju"></div></div>
+  <div class="card"><div class="ct">오행 분포 · 용신 (用神)</div><div id="oOheng"></div></div>
+</div>
+
+<!-- 이름 추천 -->
+<div id="sName" class="hide">
+  <div class="card">
+    <div class="rh">
+      <div class="ct" style="margin-bottom:0">추천 이름</div>
+      <button class="breset" onclick="resetAll()">← 다시 입력</button>
+    </div>
+    <div class="fr" id="fr"></div>
+    <div class="si" id="si"></div>
+    <div id="oName"></div>
+  </div>
+</div>
+
+</div><!-- /w -->
+
+<!-- 모달 -->
+<div class="mbg hide" id="mbg" onclick="closeMbg(event)">
+  <div class="modal">
+    <div class="mhd">
+      <div>
+        <div class="mnb" id="mdN"></div>
+        <div class="mhb" id="mdH"></div>
+      </div>
+      <button class="mcl" onclick="closeMd()">✕</button>
+    </div>
+    <div class="mb" id="mdB"></div>
+  </div>
+</div>
 
 <script>
-// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════
 // 전역 상태
-// ════════════════════════════════════════════════════════════
-let G = {
-  year:1990, month:5, day:15, hour:null,
-  gender:'M', calType:'solar', surname:'김', surnameStroke:8,
-  nameLen:2, fortunePref:['재물'],
-  sajuResult: null,
-  candidates: [],
-  selectedIdx: -1,
-};
+// ════════════════════════════════════════════════
+const G = { gender:'M', cal:'solar', leap:false, hour:null, results:[], filterEl:null };
 
-// ── 탭 이동 ────────────────────────────────────────────────
-function goTab(n) {
-  [1,2,3,4].forEach(i => {
-    document.getElementById('page'+i).classList.toggle('hidden', i !== n);
-    const btn = document.getElementById('tab'+i);
-    btn.classList.toggle('active', i === n);
+// ── 오행 색상/한자 매핑 ──
+const OHC = {목:'var(--木)',화:'var(--火)',토:'var(--土)',금:'var(--金)',수:'var(--水)'};
+const OHJ = {목:'木',화:'火',토:'土',금:'金',수:'水'};
+const JWO = {'木':'목','火':'화','土':'토','金':'금','水':'수'};
+const LKL = {great:'대길 ✦',good:'길 ◎',neutral:'평 ○',bad:'흉 ✕',terrible:'대흉 ✗'};
+
+// ── 성씨 DB (한자획수) ──
+const SDB = [
+  {k:'김',h:'金',s:8},{k:'이',h:'李',s:7},{k:'박',h:'朴',s:6},{k:'최',h:'崔',s:11},
+  {k:'정',h:'鄭',s:15},{k:'강',h:'姜',s:9},{k:'조',h:'趙',s:14},{k:'윤',h:'尹',s:4},
+  {k:'장',h:'張',s:11},{k:'임',h:'林',s:8},{k:'한',h:'韓',s:17},{k:'오',h:'吳',s:7},
+  {k:'서',h:'徐',s:10},{k:'신',h:'申',s:5},{k:'권',h:'權',s:22},{k:'황',h:'黃',s:12},
+  {k:'안',h:'安',s:6},{k:'송',h:'宋',s:7},{k:'류',h:'柳',s:9},{k:'유',h:'柳',s:9},
+  {k:'홍',h:'洪',s:9},{k:'전',h:'全',s:6},{k:'고',h:'高',s:10},{k:'문',h:'文',s:4},
+  {k:'양',h:'梁',s:11},{k:'손',h:'孫',s:10},{k:'배',h:'裵',s:14},{k:'백',h:'白',s:5},
+  {k:'허',h:'許',s:11},{k:'남',h:'南',s:9},{k:'심',h:'沈',s:7},{k:'노',h:'盧',s:16},
+  {k:'하',h:'河',s:8},{k:'곽',h:'郭',s:15},{k:'성',h:'成',s:6},{k:'차',h:'車',s:7},
+  {k:'주',h:'朱',s:6},{k:'우',h:'禹',s:9},{k:'구',h:'具',s:8},{k:'민',h:'閔',s:12},
+  {k:'나',h:'羅',s:19},{k:'라',h:'羅',s:19},{k:'진',h:'陳',s:11},{k:'엄',h:'嚴',s:20},
+  {k:'채',h:'蔡',s:14},{k:'원',h:'元',s:4},{k:'천',h:'千',s:3},{k:'방',h:'方',s:4},
+  {k:'공',h:'孔',s:4},{k:'탁',h:'卓',s:8},{k:'도',h:'都',s:12},{k:'연',h:'延',s:6},
+  {k:'석',h:'石',s:5},{k:'선',h:'宣',s:9},{k:'설',h:'薛',s:16},{k:'소',h:'蘇',s:19},
+  {k:'마',h:'馬',s:10},{k:'길',h:'吉',s:6},{k:'표',h:'表',s:8},{k:'기',h:'奇',s:8},
+];
+
+// ── 지지 시각 ──
+const JH = [
+  {j:'자',hj:'子',r:'23~01시',v:[23,0]},  {j:'축',hj:'丑',r:'01~03시',v:[1,2]},
+  {j:'인',hj:'寅',r:'03~05시',v:[3,4]},   {j:'묘',hj:'卯',r:'05~07시',v:[5,6]},
+  {j:'진',hj:'辰',r:'07~09시',v:[7,8]},   {j:'사',hj:'巳',r:'09~11시',v:[9,10]},
+  {j:'오',hj:'午',r:'11~13시',v:[11,12]}, {j:'미',hj:'未',r:'13~15시',v:[13,14]},
+  {j:'신',hj:'申',r:'15~17시',v:[15,16]}, {j:'유',hj:'酉',r:'17~19시',v:[17,18]},
+  {j:'술',hj:'戌',r:'19~21시',v:[19,20]}, {j:'해',hj:'亥',r:'21~23시',v:[21,22]},
+];
+
+// ════════════════════════════════════════════════
+// 초기화
+// ════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  buildHG();
+  // 모듈 로드 검증
+  const missing = ['Manseryok','SajuEngine','SURI_DB','HANJA_DB','JAWO_OHAENG_DB']
+    .filter(n => typeof window[n] === 'undefined');
+  if (missing.length) {
+    alert('JS 파일 로드 실패: ' + missing.join(', ') + '\nHTML과 같은 폴더에 JS 파일이 있는지 확인하세요.');
+  }
+});
+
+// ════════════════════════════════════════════════
+// UI 토글
+// ════════════════════════════════════════════════
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const e = document.getElementById('s'+i);
+    e.className = 'st' + (i<n?' done':i===n?' active':'');
   });
-  window.scrollTo({top:0, behavior:'smooth'});
+}
+function setG(g) {
+  G.gender = g;
+  document.getElementById('gM').classList.toggle('on', g==='M');
+  document.getElementById('gF').classList.toggle('on', g==='F');
+}
+function setC(c) {
+  G.cal = c;
+  document.getElementById('cS').classList.toggle('on', c==='solar');
+  document.getElementById('cL').classList.toggle('on', c==='lunar');
+  document.getElementById('lpG').style.display = c==='lunar' ? '' : 'none';
+}
+function setL(v) {
+  G.leap = v;
+  document.getElementById('lpN').classList.toggle('on', !v);
+  document.getElementById('lpY').classList.toggle('on', v);
 }
 
-// ── 유틸 ───────────────────────────────────────────────────
-const OH_COLOR = ['var(--c-wood)','var(--c-fire)','var(--c-earth)','var(--c-metal)','var(--c-water)'];
-const OH_BG    = ['var(--c-wood-bg)','var(--c-fire-bg)','var(--c-earth-bg)','var(--c-metal-bg)','var(--c-water-bg)'];
-const OH_TEXT  = ['var(--c-wood-t)','var(--c-fire-t)','var(--c-earth-t)','var(--c-metal-t)','var(--c-water-t)'];
-const OH_PILL  = ['pill-wood','pill-fire','pill-earth','pill-metal','pill-water'];
-const OH_NAMES = ['목','화','토','금','수'];
-const OH_HJ    = ['木','火','土','金','水'];
-const LUCK_LABEL = {great:'대길',good:'길',neutral:'평',bad:'흉',terrible:'대흉'};
-const LUCK_CLS   = {great:'badge-great',good:'badge-good',neutral:'badge-neutral',bad:'badge-bad',terrible:'badge-terrible'};
-const LUCK_COLOR = {great:'var(--c-wood-t)',good:'var(--c-water-t)',neutral:'var(--c-metal-t)',bad:'var(--c-fire-t)',terrible:'#a32d2d'};
-const SHINGANG_LABEL = {strong:'신강(身强) — 일간이 강합니다',weak:'신약(身弱) — 일간이 약합니다',neutral:'중화(中和) — 균형 잡힌 사주'};
-
-function ohPill(idx, text) {
-  return `<span class="pill ${OH_PILL[idx]}">${text}</span>`;
+// ── 성씨 자동완성 ──
+function onSI() {
+  const v = document.getElementById('iS').value.trim();
+  const ac = document.getElementById('acl');
+  if (!v) { ac.style.display='none'; return; }
+  const ms = SDB.filter(s => s.k.startsWith(v));
+  if (!ms.length) { ac.style.display='none'; return; }
+  ac.innerHTML = ms.slice(0,8).map(s =>
+    `<div class="aci" onmousedown="pickS('${s.k}','${s.h}',${s.s})">
+      <span>${s.k}(${s.h})</span><span class="acs">${s.s}획</span>
+    </div>`).join('');
+  ac.style.display = 'block';
+  if (ms.length === 1) { document.getElementById('iStr').value=ms[0].s; document.getElementById('shint').textContent=`${ms[0].k}(${ms[0].h}) ${ms[0].s}획 자동입력`; }
 }
-function luckBadge(luck) {
-  return `<span class="badge ${LUCK_CLS[luck]}">${LUCK_LABEL[luck]}</span>`;
+function hideAC() { setTimeout(() => document.getElementById('acl').style.display='none', 170); }
+function pickS(k,h,s) {
+  document.getElementById('iS').value=k;
+  document.getElementById('iStr').value=s;
+  document.getElementById('acl').style.display='none';
+  document.getElementById('shint').textContent=`${k}(${h}) — 한자 ${s}획`;
 }
 
-// ── 초기 이벤트 ────────────────────────────────────────────
-document.getElementById('calType').addEventListener('change', e => {
-  document.getElementById('lunarWarn').classList.toggle('hidden', e.target.value !== 'lunar');
-});
+// ── 지지 시각 그리드 ──
+function buildHG() {
+  const g = document.getElementById('hg');
+  let h = `<button class="hb none-b on" id="hbN" onclick="pickH(null)">
+    <span class="hbj" style="font-size:11px">모름</span><span class="hbt">시각 불명</span>
+  </button>`;
+  JH.forEach((jh,i) => h += `<button class="hb" id="hb${i}" onclick="pickH(${jh.v[0]})">
+    <span class="hbj">${jh.j}시</span><span class="hbh">${jh.hj}</span><span class="hbt">${jh.r}</span>
+  </button>`);
+  g.innerHTML = h;
+}
+function pickH(v) {
+  G.hour = v;
+  document.getElementById('hbN').classList.toggle('on', v===null);
+  JH.forEach((jh,i) => document.getElementById('hb'+i).classList.toggle('on', v!==null && jh.v.includes(v)));
+  document.getElementById('iHR').value = v===null ? '' : v;
+  updHL(v);
+}
+function syncHR(v) {
+  const n = parseInt(v);
+  if (isNaN(n)||n<0||n>23) { G.hour=null; updHL(null); return; }
+  G.hour = n;
+  document.getElementById('hbN').classList.remove('on');
+  JH.forEach((jh,i) => document.getElementById('hb'+i).classList.toggle('on', jh.v.includes(n)));
+  updHL(n);
+}
+function updHL(h) {
+  const el = document.getElementById('hlbl');
+  if (h===null||h===undefined) { el.textContent='—'; return; }
+  const info = JH.find(jh => jh.v.includes(h) || (h===23 && jh.j==='자'));
+  el.textContent = info ? `${info.j}시(${info.hj}) · ${info.r}` : '—';
+}
 
-// 성씨 자동 획수 계산
-document.getElementById('surname').addEventListener('input', e => {
-  const s = e.target.value.trim();
-  if (!s) return;
-  const stroke = getSurnameStroke(s);
-  document.getElementById('surnameStroke').value = stroke;
-  document.getElementById('strokeHint').textContent = `자동 계산: ${stroke}획 (수정 가능)`;
-});
+// ── 음력→양력 근사 변환 ──
+function lunarApprox(y,m,d) {
+  const off=[21,20,18,17,17,15,15,14,14,14,14,14];
+  const dt = new Date(y, m-1, d+(off[m-1]||20));
+  return {y:dt.getFullYear(), m:dt.getMonth()+1, d:dt.getDate()};
+}
 
-// 운 체크박스 토글
-document.querySelectorAll('.fortune-check').forEach(label => {
-  label.addEventListener('click', () => {
-    label.classList.toggle('checked', label.querySelector('input').checked);
+// ════════════════════════════════════════════════
+// 메인 실행
+// ════════════════════════════════════════════════
+function run() {
+  const sung    = document.getElementById('iS').value.trim();
+  const strokes = parseInt(document.getElementById('iStr').value);
+  const year    = parseInt(document.getElementById('iY').value);
+  const month   = parseInt(document.getElementById('iM').value);
+  const day     = parseInt(document.getElementById('iD').value);
+
+  if (!sung)               return alert('성씨를 입력해주세요.');
+  if (!strokes||strokes<1) return alert('성씨 한자 획수를 입력해주세요.\n예: 金→8, 李→7, 朴→6');
+  if (!year||year<1900)    return alert('출생 연도를 입력해주세요.');
+  if (!month)              return alert('출생 월을 선택해주세요.');
+  if (!day||day<1||day>31) return alert('출생 일을 입력해주세요.');
+
+  let fy=year, fm=month, fd=day, lunarMsg='';
+  if (G.cal==='lunar') {
+    const c = lunarApprox(year, month, day);
+    fy=c.y; fm=c.m; fd=c.d;
+    lunarMsg = `※ 음력 ${year}.${month}.${day}${G.leap?'(윤)':''} → 양력 약 ${fy}.${fm}.${fd} 변환 (정밀도는 만세력으로 확인 권장)`;
+  }
+
+  const hourArg = G.hour===null ? -1 : G.hour;
+
+  // ── Manseryok로 사주 계산 ──
+  const pillars = Manseryok.getPillars(fy, fm, fd, hourArg);
+
+  // ── SajuEngine.analyze로 용신 도출 ──
+  const ana = SajuEngine.analyze(fy, fm, fd, hourArg);
+  // ana.yongsin = [{oh:'목', ss:'인성(印星)'}, ...] 형태
+  // ana.dist    = {목:N, 화:N, 토:N, 금:N, 수:N}
+
+  // 용신: 첫 번째 항목 사용
+  const yongsinOh = ana.yongsin.yongsin[0].oh;   // '목'|'화'|'토'|'금'|'수'
+  const yongsinJW = OHJ[yongsinOh];               // '木'|'火'|'土'|'金'|'水'
+
+  renderSaju(pillars, ana.dist, yongsinOh, yongsinJW, ana, lunarMsg);
+  genNames(sung, strokes, yongsinJW, ana);
+
+  setStep(2);
+  show('sInput','hide'); show('sSaju','show'); show('sName','show');
+  setTimeout(()=>document.getElementById('sSaju').scrollIntoView({behavior:'smooth'}), 80);
+}
+
+function show(id, cls) { document.getElementById(id).className = cls; }
+
+// ── 사주 원국 렌더 ──
+function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
+  const OHN = Manseryok.OHENG_NAMES;
+  const SOI = Manseryok.STEM_OHENG_IDX;
+  const BOI = Manseryok.BRANCH_OHENG_IDX;
+  const cols = [pillars.yeonju, pillars.wolju, pillars.ilju, pillars.siju];
+  const LBL  = ['연주(年柱)','월주(月柱)','일주(日柱)','시주(時柱)'];
+
+  let t = `<table class="pt"><tr><th></th>`;
+  cols.forEach((p,i) => p && (t+=`<th>${LBL[i]}</th>`));
+  t += `</tr>`;
+  ['천간','지지'].forEach((row,ri) => {
+    t += `<tr><td style="font-size:10px;color:var(--dim);letter-spacing:1px">${row}</td>`;
+    cols.forEach(p => {
+      if (!p) return;
+      const oh  = ri===0 ? OHN[SOI[p.stemIdx]] : OHN[BOI[p.branchIdx]];
+      const col = OHC[oh];
+      const big = ri===0 ? p.ganHJ : p.jiHJ;
+      const sm  = ri===0 ? `${p.gan} · ${oh}(${OHJ[oh]})` : `${p.ji} · ${oh}(${OHJ[oh]})`;
+      t += `<td><span class="pb" style="color:${col}">${big}</span><span class="ps">${sm}</span></td>`;
+    });
+    t += `</tr>`;
   });
-});
+  t += `</table>`;
+  if (lunarMsg) t += `<div class="lunar-w">${lunarMsg}</div>`;
+  document.getElementById('oSaju').innerHTML = t;
 
-// ════════════════════════════════════════════════════════════
-// STEP 1 → 사주 분석
-// ════════════════════════════════════════════════════════════
-function doAnalyze() {
-  G.year   = parseInt(document.getElementById('year').value)  || 1990;
-  G.month  = parseInt(document.getElementById('month').value) || 5;
-  G.day    = parseInt(document.getElementById('day').value)   || 15;
-  const hv = document.getElementById('hour').value.trim();
-  G.hour   = hv === '' ? null : parseInt(hv);
-  G.gender = document.getElementById('gender').value;
-  G.calType= document.getElementById('calType').value;
-  G.surname= document.getElementById('surname').value.trim() || '김';
-  G.surnameStroke = parseInt(document.getElementById('surnameStroke').value) || getSurnameStroke(G.surname);
-  G.nameLen= parseInt(document.getElementById('nameLen').value);
-  G.fortunePref = Array.from(document.querySelectorAll('#fortuneGrid input:checked')).map(el => el.value);
+  // 오행 분포
+  const total = Object.values(dist).reduce((a,b)=>a+b,0);
+  let d = '<div class="od">';
+  ['목','화','토','금','수'].forEach(oh => {
+    const n = dist[oh]||0;
+    const pct = total ? (n/total*100).toFixed(0) : 0;
+    const jw = OHJ[oh], col = OHC[oh];
+    d += `<div class="or">
+      <span class="ol" style="color:${col}">${jw}(${oh})</span>
+      <div class="obg"><div class="obf" style="width:${pct}%;background:${col}"></div></div>
+      <span class="oc">${n}</span>
+    </div>`;
+  });
+  d += '</div>';
 
-  // 유효성 검사
-  if (G.month < 1 || G.month > 12 || G.day < 1 || G.day > 31) {
-    alert('날짜를 올바르게 입력해주세요.'); return;
+  // 용신 박스
+  const ysCol = OHC[yongsinOh];
+  const ysInfo = ana.yongsin.yongsin.map(v=>`${v.oh}(${OHJ[v.oh]}) — ${v.ss}`).join(', ');
+  d += `<div class="ysbox">
+    <div class="ysc" style="color:${ysCol}">${yongsinJW}</div>
+    <div>
+      <div class="yst">用神 · 용신</div>
+      <div class="ysn" style="color:${ysCol}">${ysInfo}</div>
+      <div class="ysd">신강약: <strong>${ana.shingang.level==='strong'?'신강(身强)':ana.shingang.level==='weak'?'신약(身弱)':'중화(中和)'}</strong> · 격국: <strong>${ana.geokguk}</strong><br>이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충하여 사주 균형을 맞춥니다.</div>
+    </div>
+  </div>`;
+  document.getElementById('oOheng').innerHTML = d;
+}
+
+// ── 이름 생성 ──
+function genNames(sung, strokes, yongsinJW, ana) {
+  document.getElementById('oName').innerHTML =
+    `<div class="ld"><div class="sp"></div><p>이름 조합 분석 중…</p></div>`;
+
+  setTimeout(() => {
+    // HANJA_DB + JAWO_OHAENG_DB 통합
+    const pool = [];
+    const seen = new Set();
+    HANJA_DB.forEach(h => {
+      const el = h.element==='Water'?'水':h.element;
+      const k = h.char+el;
+      if (!seen.has(k)) { seen.add(k); pool.push({char:h.char,korean:h.korean,strokes:h.strokes,element:el,meaning:h.meaning,gender:h.gender,hanja:h.char}); }
+    });
+    Object.entries(JAWO_OHAENG_DB).forEach(([el,list]) => {
+      list.forEach(item => {
+        const k = item.char+el;
+        if (!seen.has(k)) {
+          seen.add(k);
+          const parts = item.kor.split(' ');
+          pool.push({char:item.char,korean:parts[parts.length-1],strokes:item.stroke,element:el,meaning:item.meaning,gender:'N',hanja:item.char});
+        }
+      });
+    });
+
+    // 성별 필터
+    const gp = pool.filter(h => h.gender===G.gender || h.gender==='N');
+
+    // db_saju.js의 recommendNames() 사용
+    const raw = recommendNames(sung, strokes, yongsinJW, gp);
+
+    // 점수 정렬
+    const ls = {great:3,good:2,neutral:1,bad:0,terrible:-1};
+    raw.sort((a,b) => {
+      const sa = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[a.suriGeok[k].luck]||0),0);
+      const sb = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[b.suriGeok[k].luck]||0),0);
+      return sb-sa;
+    });
+
+    G.results = raw;
+    renderNames(raw);
+  }, 300);
+}
+
+// ── 이름 목록 렌더 ──
+function renderNames(list) {
+  const allEl = ['木','火','土','金','水'];
+  let fr = `<button class="fb on" onclick="filterE(null,this)">전체 (${list.length})</button>`;
+  allEl.forEach(el => {
+    const cnt = list.filter(r=>r.resourceOhaeng.includes(el)).length;
+    if (cnt) fr += `<button class="fb" onclick="filterE('${el}',this)">${el} ${cnt}</button>`;
+  });
+  document.getElementById('fr').innerHTML = fr;
+  document.getElementById('si').textContent =
+    list.length ? `총 ${list.length}개 · 수리오행 4격 점수순` : '';
+
+  if (!list.length) {
+    document.getElementById('oName').innerHTML =
+      `<div class="emp"><span class="emc">名</span><p>조건에 맞는 이름이 없습니다.</p>
+       <p style="font-size:10px;margin-top:6px;color:var(--dim)">성씨 획수를 다시 확인하거나 다른 조건으로 시도해보세요.</p></div>`;
+    setStep(3); return;
   }
 
-  try {
-    G.sajuResult = SajuEngine.analyze(G.year, G.month, G.day, G.hour, G.gender);
-  } catch(e) {
-    alert('사주 계산 오류: ' + e.message); return;
-  }
-
-  renderAnalyze();
-  goTab(2);
-}
-
-function renderAnalyze() {
-  const R = G.sajuResult;
-  const { yeonju, wolju, ilju, siju, dist, shingang, geokguk, yongsin, daeun, hapchung, sinsal, ilganDesc } = R;
-  const total = dist.reduce((a,b)=>a+b,0) || 1;
-
-  // 4주 기둥
-  const pillarHTML = (p, label) => p ? `
-    <div class="saju-pillar">
-      <div class="pillar-label">${label}</div>
-      <div class="pillar-gan" style="color:${OH_COLOR[Manseryok.STEM_OHENG_IDX[p.stemIdx]]}">${p.ganHJ}</div>
-      <div class="pillar-ji"  style="color:${OH_COLOR[Manseryok.BRANCH_OHENG_IDX[p.branchIdx]]}">${p.jiHJ}</div>
-      <div class="pillar-kor">${p.gan}${p.ji}</div>
-    </div>` : `
-    <div class="saju-pillar">
-      <div class="pillar-label">시주 時柱</div>
-      <div class="pillar-kor" style="margin-top:20px">미상</div>
-    </div>`;
-
-  // 오행 바
-  const ohBarHTML = OH_NAMES.map((nm, i) => `
-    <div class="oheng-item">
-      <div class="oheng-num" style="color:${OH_COLOR[i]}">${dist[i]}</div>
-      <div class="oheng-track"><div class="oheng-fill" style="width:${Math.round(dist[i]/total*100)}%;background:${OH_COLOR[i]}"></div></div>
-      <div class="oheng-name">${OH_HJ[i]}(${nm})</div>
-    </div>`).join('');
-
-  // 용신·희신·기신 pill
-  const yongPills = yongsin.yongsin.map(y => ohPill(y.idx, `용신 ${y.hj}(${y.name})`)).join('');
-  const heePills  = yongsin.heesin.map(y  => ohPill(y.idx, `희신 ${y.hj}(${y.name})`)).join('');
-  const giPills   = yongsin.gisin.map(y   => ohPill(y.idx, `기신 ${y.hj}(${y.name})`)).join('');
-
-  // 대운
-  const daeunHTML = daeun.runs.map(d => `
-    <div class="daeun-item">
-      <div class="daeun-age">${d.age}세~</div>
-      <div class="daeun-gan" style="color:${OH_COLOR[Manseryok.STEM_OHENG_IDX[d.stemIdx]]}">${d.ganHJ}</div>
-      <div class="daeun-ji"  style="color:${OH_COLOR[Manseryok.BRANCH_OHENG_IDX[d.branchIdx]]}">${d.jiHJ}</div>
-    </div>`).join('');
-
-  // 합·충
-  const hapStr  = hapchung.cheonganHap.map(h=>`<span class="pill pill-wood">${h.name} (${h.pos})</span>`).join('')
-    + hapchung.jijihap.map(h=>`<span class="pill pill-fire">${h.name}</span>`).join('')
-    + hapchung.chung.map(h=>`<span class="pill pill-metal">${h.name} (${h.pos})</span>`).join('');
-
-  // 신살
-  const sinsalHTML = sinsal.length ? sinsal.map(s => `
-    <div class="sinsal-item">
-      <div class="sinsal-name">${s.name} <span style="font-size:11px;color:var(--c-text3)">${s.pos}</span></div>
-      <div class="sinsal-desc">${s.desc}</div>
-    </div>`).join('') : '<span style="color:var(--c-text3);font-size:13px">주요 신살 없음</span>';
-
-  // 운별 강화 포인트
-  const fortuneMap = {
-    재물: '편재(偏財)·정재(正財) 기운을 이름에 담으세요. 용신 방향의 수(水)·금(金) 한자가 재물운을 보강합니다.',
-    건강: '인성(印星) 오행이 강해지면 체력과 면역이 올라갑니다. 용신 오행과 일치하는 한자를 우선 선택하세요.',
-    학업: '수(水)·금(金) 기운이 지혜와 학업운을 담당합니다. 음령오행에 수(水) 기운의 초성(ㅁ·ㅂ·ㅍ)을 반영하세요.',
-    명예: '관성(官星) 오행 방향의 한자가 명예·사회적 지위를 높입니다. 수리 정격 길수를 최우선으로 고르세요.',
-    인간관계: '목(木)·토(土) 기운이 인덕(人德)과 인간관계를 넓힙니다. 뜻이 따뜻하고 포용적인 한자를 선택하세요.',
-  };
-  const fortuneHTML = G.fortunePref.length ? G.fortunePref.map(f => `
-    <div class="arow">
-      <div class="arow-icon" style="background:var(--c-fire-bg);color:var(--c-fire-t)">⭐</div>
-      <div><div class="arow-label">${f}운 강화 포인트</div><div class="arow-desc">${fortuneMap[f]||''}</div></div>
-    </div>`).join('') : '';
-
-  document.getElementById('analyzeResult').innerHTML = `
-
-    <div class="card">
-      <div class="card-title">🀄 사주원국 (四柱原局)</div>
-      <div class="saju-grid">
-        ${pillarHTML(yeonju,'연주 年柱')}
-        ${pillarHTML(wolju, '월주 月柱')}
-        ${pillarHTML(ilju,  '일주 日柱')}
-        ${pillarHTML(siju,  '시주 時柱')}
+  let h = '<div class="ng">';
+  list.slice(0,48).forEach((r,idx) => {
+    const [e1,e2] = r.resourceOhaeng.split('·');
+    const nameBody = r.name.slice(1); // 성 제거
+    h += `<div class="nc" onclick="showDet(${idx})">
+      <div class="nk">${nameBody} <span class="nh">${r.hanjaName}</span></div>
+      <div class="nfull">${r.name} / ${r.hanjaName}</div>
+      <div class="nbs">
+        <span class="ob ob-${e1}">${e1}</span>
+        <span class="ob ob-${e2}">${e2}</span>
+        <span style="font-size:9px;color:var(--dim);margin-left:3px">${r.yongsinMatch}</span>
       </div>
-      <div style="font-size:12px;color:var(--c-text3);margin-top:4px">
-        일간(日干): <strong>${ilju.ganHJ}(${ilju.gan})</strong> — ${ilganDesc.name||''} / 격국: <strong>${geokguk}</strong>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">⚖️ 오행 분포</div>
-      <div class="oheng-bar">${ohBarHTML}</div>
-      <div class="arow" style="margin-top:8px">
-        <div class="arow-icon" style="background:var(--c-bg2)">📊</div>
-        <div><div class="arow-label">신강신약 판단</div><div class="arow-val">${SHINGANG_LABEL[shingang]}</div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🎯 용신·희신·기신 (이름 작명 기준)</div>
-      <div class="arow">
-        <div class="arow-icon" style="background:${OH_BG[yongsin.yongsin[0]?.idx??0]};color:${OH_TEXT[yongsin.yongsin[0]?.idx??0]}">↑</div>
-        <div>
-          <div class="arow-label">용신(用神) — 이름에 반드시 담아야 할 오행</div>
-          <div class="arow-val">${yongPills}</div>
-          <div class="arow-desc">사주에 가장 필요한 오행으로, 자원·음령·수리 모두 이 기운을 중심으로 작명합니다.</div>
-        </div>
-      </div>
-      <div class="arow">
-        <div class="arow-icon" style="background:var(--c-bg2)">↗</div>
-        <div>
-          <div class="arow-label">희신(喜神) — 용신을 돕는 보조 오행</div>
-          <div class="arow-val">${heePills}</div>
-        </div>
-      </div>
-      <div class="arow">
-        <div class="arow-icon" style="background:var(--c-fire-bg);color:var(--c-fire-t)">↓</div>
-        <div>
-          <div class="arow-label">기신(忌神) — 이름에 피해야 할 오행</div>
-          <div class="arow-val">${giPills}</div>
-        </div>
-      </div>
-    </div>
-
-    ${ilganDesc.personality ? `
-    <div class="card">
-      <div class="card-title">🧬 일간 성격 분석 (${ilganDesc.name})</div>
-      <div class="arow">
-        <div class="arow-icon" style="background:var(--c-bg2)">${ilganDesc.symbol?.'[0]'||'🌿'}</div>
-        <div>
-          <div class="arow-desc" style="font-size:13px">${ilganDesc.personality}</div>
-          <div style="margin-top:6px">
-            <span class="pill pill-wood">강점: ${ilganDesc.strength}</span>
-            <span class="pill pill-fire">약점: ${ilganDesc.weakness}</span>
-          </div>
-        </div>
-      </div>
-    </div>` : ''}
-
-    ${G.fortunePref.length ? `
-    <div class="card">
-      <div class="card-title">⭐ 강조 운 작명 포인트</div>
-      ${fortuneHTML}
-    </div>` : ''}
-
-    ${hapStr ? `
-    <div class="card">
-      <div class="card-title">🔗 합충(合沖) 관계</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">${hapStr}</div>
-    </div>` : ''}
-
-    <div class="card">
-      <div class="card-title">🌟 신살(神殺)</div>
-      <div class="sinsal-list">${sinsalHTML}</div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📅 대운(大運) <span style="font-size:12px;font-weight:400;color:var(--c-text3)">${daeun.forward?'순행':'역행'} · ${daeun.startAge}세 시작</span></div>
-      <div class="daeun-strip">${daeunHTML}</div>
-    </div>
-  `;
-}
-
-// ════════════════════════════════════════════════════════════
-// STEP 2 → 이름 추천
-// ════════════════════════════════════════════════════════════
-function doGenNames() {
-  if (!G.sajuResult) return;
-  document.getElementById('nameResult').innerHTML =
-    '<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div> 이름 조합 생성 중...</div>';
-  goTab(3);
-  setTimeout(renderNames, 80);
-}
-
-function renderNames() {
-  try {
-    G.candidates = NamingEngine.generateNames(
-      G.sajuResult, G.surname, G.nameLen, G.gender, G.fortunePref
-    );
-  } catch(e) {
-    document.getElementById('nameResult').innerHTML =
-      `<div class="error-box">이름 생성 오류: ${e.message}</div>`; return;
-  }
-
-  if (!G.candidates.length) {
-    document.getElementById('nameResult').innerHTML =
-      '<div class="warn-box">조건에 맞는 이름 조합을 찾지 못했습니다. 성씨 획수나 조건을 바꿔보세요.</div>';
-    return;
-  }
-
-  const yong = G.sajuResult.yongsin.yongsin[0];
-
-  const cards = G.candidates.map((c, idx) => {
-    const pct = Math.round(c.total / c.maxScore * 100);
-    const clampPct = Math.min(pct, 99);
-    const labelCls = clampPct >= 75 ? 'badge-great' : clampPct >= 55 ? 'badge-good' : 'badge-neutral';
-    const labelTxt = clampPct >= 75 ? '추천' : '양호';
-    const nameHanja = c.h1.char + (c.h2 ? c.h2.char : '');
-    const nameKor   = c.h1.kor  + (c.h2 ? c.h2.kor  : '');
-
-    const geokItems = [
-      {k:'won',l:'원격',d:'초년'},
-      {k:'hyeong',l:'형격',d:'청년'},
-      {k:'i',l:'이격',d:'장년'},
-      {k:'jeong',l:'정격',d:'총운'},
-    ].map(g => {
-      const n = c.geok[g.k];
-      const luck = SURI_DB[n]?.luck;
-      return `<div class="geok-item">
-        <div class="geok-label">${g.l} ${g.d}</div>
-        <div class="geok-num" style="color:${LUCK_COLOR[luck]}">${n}수 ${LUCK_LABEL[luck]}</div>
-      </div>`;
-    }).join('');
-
-    return `
-    <div class="name-card" id="nc${idx}" onclick="selectName(${idx})">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div>
-          <span class="name-title">${G.surname}${nameHanja}</span>
-          <span class="name-kor">${G.surname}${nameKor}</span>
-        </div>
-        <span class="badge ${labelCls}">${labelTxt} ${clampPct}점</span>
-      </div>
-      <div class="name-mean">${c.h1.meaning}${c.h2 ? ' · ' + c.h2.meaning : ''}</div>
-      <div class="tag-row">
-        ${ohPill(c.h1.oh, `자원 ${OH_HJ[c.h1.oh]}`)}
-        ${c.h2 ? ohPill(c.h2.oh, `자원 ${OH_HJ[c.h2.oh]}`) : ''}
-        ${ohPill(c.eumOh1, `음령 ${OH_HJ[c.eumOh1]}`)}
-        ${c.eumOh2 !== null ? ohPill(c.eumOh2, `음령 ${OH_HJ[c.eumOh2]}`) : ''}
-      </div>
-      <div class="geok-row">${geokItems}</div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('nameResult').innerHTML = `
-    <div class="info-box">
-      용신 <strong>${OH_HJ[yong.idx]}(${yong.name})</strong> 기준 — 자원오행·음령오행·수리성명학 종합 추천 이름입니다.<br>
-      이름을 클릭하면 상세 검수 결과를 확인할 수 있습니다.
-    </div>
-    ${cards}
-  `;
-}
-
-// ════════════════════════════════════════════════════════════
-// STEP 3 → 상세 검수
-// ════════════════════════════════════════════════════════════
-function selectName(idx) {
-  G.selectedIdx = idx;
-  document.querySelectorAll('.name-card').forEach((el, i) =>
-    el.classList.toggle('selected', i === idx)
-  );
-  renderDetail(G.candidates[idx]);
-  goTab(4);
-}
-
-function renderDetail(c) {
-  const checks = NamingEngine.inspectName(c, G.sajuResult, G.surname);
-  const nameHanja = c.h1.char + (c.h2 ? c.h2.char : '');
-  const nameKor   = c.h1.kor  + (c.h2 ? c.h2.kor  : '');
-  const surnameEumOh = getEumOh(G.surname[G.surname.length - 1]);
-
-  const allOk    = checks.every(ck => !ck.warn);
-  const hasWarn  = checks.some(ck => ck.warn && !SURI_DB[c.geok?.jeong]?.luck?.includes('terrible'));
-  const hasBad   = checks.some(ck => ck.warn);
-
-  const statusBox = allOk
-    ? `<div class="info-box">✅ 모든 항목이 양호합니다. 우수한 이름입니다.</div>`
-    : hasBad
-    ? `<div class="warn-box">⚠️ 일부 항목을 확인하세요. 아래 세부 내용을 검토해 주세요.</div>`
-    : `<div class="info-box">대체로 양호합니다.</div>`;
-
-  const checkHTML = checks.map(ck => {
-    const cls = ck.ok ? 'dot-ok' : ck.warn ? 'dot-bad' : 'dot-warn';
-    const icon = ck.ok ? '✓' : ck.warn ? '✕' : '△';
-    return `
-    <div class="check-item">
-      <div class="check-dot ${cls}">${icon}</div>
-      <div>
-        <div class="check-label">${ck.label} ${ck.luck ? luckBadge(ck.luck) : ''}</div>
-        <div class="check-desc">${ck.desc}</div>
+      <div class="sr">
+        ${['won','hyeong','i','jeong'].map((k,ki)=>{
+          const lb=['원격','형격','이격','정격'][ki];
+          const v=r.suriGeok[k];
+          return `<div class="sc"><span class="scl">${lb}</span>
+            <span class="scn lg-${v.luck}">${v.value}</span>
+            <span class="sck lg-${v.luck}">${LKL[v.luck]||''}</span></div>`;
+        }).join('')}
       </div>
     </div>`;
-  }).join('');
-
-  // 수리 4격 상세
-  const geokDetail = [
-    {k:'won',  label:'원격(元格)', desc:'초년·청소년 운세'},
-    {k:'hyeong',label:'형격(亨格)',desc:'청년·중년 운세'},
-    {k:'i',    label:'이격(利格)', desc:'장년 운세'},
-    {k:'jeong',label:'정격(貞格)', desc:'총운 및 말년'},
-  ].map(g => {
-    const n = c.geok[g.k];
-    const info = SURI_DB[n] || {};
-    return `
-    <div style="padding:10px;border:0.5px solid var(--c-border);border-radius:var(--r-md)">
-      <div style="font-size:11px;color:var(--c-text3)">${g.label}</div>
-      <div style="font-size:11px;color:var(--c-text3);margin-bottom:6px">${g.desc}</div>
-      <div style="font-size:20px;font-weight:500;color:${LUCK_COLOR[info.luck]}">${n}수</div>
-      <div style="margin:4px 0">${luckBadge(info.luck)}</div>
-      <div style="font-size:12px;color:var(--c-text2);margin-top:4px">${info.meaning||''}</div>
-    </div>`;
-  }).join('');
-
-  // 음령 흐름
-  const eumFlow = [
-    {label: G.surname, oh: surnameEumOh, note: '성씨'},
-    {label: c.h1.char, oh: c.eumOh1,    note: c.h1.kor},
-    ...(c.h2 ? [{label: c.h2.char, oh: c.eumOh2, note: c.h2.kor}] : []),
-  ].map((item, i, arr) => {
-    const arrow = i < arr.length - 1 ? `<span style="color:var(--c-text3);font-size:20px;align-self:center">→</span>` : '';
-    const isGil = i > 0 && NamingEngine.isGil(arr[i-1].oh, item.oh);
-    const isKe  = i > 0 && NamingEngine.isShangke(arr[i-1].oh, item.oh);
-    const flowNote = i > 0 ? (isGil ? '✓' : isKe ? '상극' : '') : '';
-    const flowColor = i > 0 ? (isGil ? 'var(--c-wood-t)' : isKe ? 'var(--c-fire-t)' : 'var(--c-text3)') : '';
-    return `
-    <div style="text-align:center">
-      <div style="font-size:11px;color:var(--c-text3)">${item.note}</div>
-      <span class="pill ${OH_PILL[item.oh]}">${item.label} ${OH_HJ[item.oh]}</span>
-      ${flowNote ? `<div style="font-size:11px;color:${flowColor};margin-top:2px">${flowNote}</div>` : ''}
-    </div>
-    ${arrow}`;
-  }).join('');
-
-  // 종합 점수
-  const pct = Math.min(Math.round(c.total / c.maxScore * 100), 99);
-  const scoreColor = pct >= 75 ? 'var(--c-wood-t)' : pct >= 55 ? 'var(--c-water-t)' : 'var(--c-metal-t)';
-
-  document.getElementById('detailResult').innerHTML = `
-
-    <div class="card">
-      <div style="text-align:center;padding:1rem 0">
-        <div style="font-size:13px;color:var(--c-text3);margin-bottom:8px">선택한 이름</div>
-        <div style="font-size:36px;font-weight:500;letter-spacing:6px">${G.surname}${nameHanja}</div>
-        <div style="font-size:18px;color:var(--c-text2);margin-top:4px">${G.surname}${nameKor}</div>
-        <div style="font-size:13px;color:var(--c-text3);margin-top:8px">${c.h1.meaning}${c.h2 ? ' · ' + c.h2.meaning : ''}</div>
-      </div>
-      <div class="score-ring">
-        <div class="score-big" style="color:${scoreColor}">${pct}</div>
-        <div class="score-label">종합 점수 / 100</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">✅ 작명 검수 결과</div>
-      ${statusBox}
-      ${checkHTML}
-    </div>
-
-    <div class="card">
-      <div class="card-title">🔢 수리성명학 4격 상세</div>
-      <div style="font-size:12px;color:var(--c-text3);margin-bottom:10px">
-        성씨 획수 ${G.surnameStroke}획 + ${c.h1.char}(${c.h1.stroke}획)${c.h2 ? ' + ' + c.h2.char + '(' + c.h2.stroke + '획)' : ''}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${geokDetail}</div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🌊 음령오행(音靈五行) 흐름</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px">${eumFlow}</div>
-      <div style="font-size:12px;color:var(--c-text3);margin-top:10px">
-        상생(相生) 또는 동기(同氣) 흐름이면 이름의 기운이 자연스럽게 이어집니다.
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🎯 자원오행(字源五行) 분석</div>
-      <div class="arow">
-        <div class="arow-icon" style="background:${OH_BG[c.h1.oh]};color:${OH_TEXT[c.h1.oh]}">${OH_HJ[c.h1.oh]}</div>
-        <div>
-          <div class="arow-label">${c.h1.char} (${c.h1.kor}, ${c.h1.stroke}획)</div>
-          <div class="arow-val">${c.h1.meaning}</div>
-          <div class="arow-desc">자원오행: ${OH_HJ[c.h1.oh]}(${OH_NAMES[c.h1.oh]})</div>
-        </div>
-      </div>
-      ${c.h2 ? `
-      <div class="arow">
-        <div class="arow-icon" style="background:${OH_BG[c.h2.oh]};color:${OH_TEXT[c.h2.oh]}">${OH_HJ[c.h2.oh]}</div>
-        <div>
-          <div class="arow-label">${c.h2.char} (${c.h2.kor}, ${c.h2.stroke}획)</div>
-          <div class="arow-val">${c.h2.meaning}</div>
-          <div class="arow-desc">자원오행: ${OH_HJ[c.h2.oh]}(${OH_NAMES[c.h2.oh]})</div>
-        </div>
-      </div>` : ''}
-    </div>
-
-    <div class="card" style="background:var(--c-bg2)">
-      <div class="card-title">📌 작명 원리 요약</div>
-      <div style="font-size:13px;color:var(--c-text2);line-height:1.8">
-        <strong>용신:</strong> ${G.sajuResult.yongsin.yongsin.map(y=>OH_HJ[y.idx]+'('+y.name+')').join('·')} &nbsp;|&nbsp;
-        <strong>격국:</strong> ${G.sajuResult.geokguk} &nbsp;|&nbsp;
-        <strong>신강신약:</strong> ${SHINGANG_LABEL[G.sajuResult.shingang]}<br>
-        <span style="color:var(--c-text3)">
-          이 이름은 사주에 부족한 오행을 자원오행·음령오행·수리성명학 세 가지 방식으로 보완하여 선택되었습니다.
-        </span>
-      </div>
-    </div>
-  `;
+  });
+  h += '</div>';
+  document.getElementById('oName').innerHTML = h;
+  setStep(3);
 }
+
+function filterE(el, btn) {
+  G.filterEl = el;
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderNames(el ? G.results.filter(r=>r.resourceOhaeng.includes(el)) : G.results);
+}
+
+// ── 상세 모달 ──
+function showDet(idx) {
+  const list = G.filterEl ? G.results.filter(r=>r.resourceOhaeng.includes(G.filterEl)) : G.results;
+  const r = list[idx]; if (!r) return;
+  const [e1,e2] = r.resourceOhaeng.split('·');
+  const nameBody = r.name.slice(1);
+  document.getElementById('mdN').textContent = r.name;
+  document.getElementById('mdH').textContent = nameBody + ' · ' + r.hanjaName;
+
+  // 한자 정보 검색
+  const chars = [nameBody[0], nameBody[1]];
+  const hInfo = chars.map(c => {
+    const a = HANJA_DB.find(h=>h.char===c);
+    if (a) return a;
+    for (const [,lst] of Object.entries(JAWO_OHAENG_DB)) {
+      const x = lst.find(i=>i.char===c);
+      if (x) return {char:x.char, korean:x.kor.split(' ').pop(), strokes:x.stroke, element:'', meaning:x.meaning};
+    }
+    return null;
+  });
+
+  // 음령오행 흐름 렌더
+  const eum = r.eumOhaeng;
+  let efh = '<div class="ef">';
+  eum.flow.forEach((fl,i) => {
+    const raw = fl.replace(/[()목화토금수]/g,'').trim() || fl;
+    efh += `<div style="display:inline-flex;align-items:center;gap:4px">
+      <span class="efe">${fl}</span>${i<eum.flow.length-1?'<span class="efa">→</span>':''}
+    </div>`;
+  });
+  efh += '</div>';
+  eum.details.forEach(d => {
+    const ok = d.includes('상생')||d.includes('동기');
+    efh += `<div class="efd" style="color:${ok?'var(--good)':'var(--bad)'}">${d}</div>`;
+  });
+  efh += `<div style="font-size:10px;color:var(--mut);margin-top:5px;line-height:1.5">${eum.comment}</div>`;
+
+  document.getElementById('mdB').innerHTML = `
+    <div class="ms">
+      <div class="mst">한자 의미</div>
+      <div class="hjg">${[0,1].map(i=>{
+        const h=hInfo[i]; const el=[e1,e2][i]; const col=OHC[JWO[el]]||'var(--mut)';
+        if(!h) return `<div class="hji"><div class="hjb" style="color:${col}">${chars[i]}</div><div class="hji-t"><strong>${chars[i]}</strong></div></div>`;
+        const elh=h.element?`오행: <span style="color:${col}">${el}</span><br>`:'';
+        return `<div class="hji">
+          <div class="hjb" style="color:${col}">${h.char}</div>
+          <div class="hji-t"><strong>${h.korean||''}(${h.char})</strong><br>획수: ${h.strokes}획<br>${elh}${h.meaning}</div>
+        </div>`;
+      }).join('')}</div>
+    </div>
+    <div class="ms">
+      <div class="mst">수리오행 사격 (四格)</div>
+      <div class="sgg">${['won','hyeong','i','jeong'].map((k,ki)=>{
+        const lbl=['원격(元格) 성+이름1','형격(亨格) 이름1+이름2','이격(利格) 성+이름2','정격(貞格) 전체'][ki];
+        const v=r.suriGeok[k];
+        return `<div class="sgi"><div class="sgl">${lbl}</div>
+          <div class="sgn lg-${v.luck}">${v.value} <span style="font-size:12px">${LKL[v.luck]||''}</span></div>
+          <div class="sgm">${v.meaning||''}</div></div>`;
+      }).join('')}</div>
+    </div>
+    <div class="ms">
+      <div class="mst">음령오행 흐름</div>
+      ${efh}
+    </div>`;
+
+  document.getElementById('mbg').className = 'mbg show';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMbg(e) { if(e.target===document.getElementById('mbg')) closeMd(); }
+function closeMd() {
+  document.getElementById('mbg').className = 'mbg hide';
+  document.body.style.overflow = '';
+}
+function resetAll() {
+  G.hour=null; G.filterEl=null; G.results=[];
+  show('sInput','show'); show('sSaju','hide'); show('sName','hide');
+  setStep(1);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeMd(); });
 </script>
 </body>
 </html>
