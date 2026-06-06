@@ -780,10 +780,9 @@ function genNames(sung, strokes, yongsinJW, ana) {
       const kor2 = c2 ? c2.korean : hanjaChars[1];
       const koreanName = sung + kor1 + kor2;
 
-      // eumOhaeng.details 누락 시 빈 배열로 보완
       const eum = r.eumOhaeng || {};
-      if (!eum.details) eum.details = [];
-      if (!eum.flow) eum.flow = [];
+      if (!eum.details) eum.details = []; // 혹시 모를 방어코드 유지
+      if (!eum.flow)    eum.flow    = [];
 
       return { ...r, name: koreanName, eumOhaeng: eum };
     });
