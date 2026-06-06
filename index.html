@@ -360,7 +360,7 @@ const JH = [
 document.addEventListener('DOMContentLoaded', () => {
   buildHG();
   // 모듈 로드 검증
-  const missing = ['manseryok', 'saju-engine', 'db_saju', 'db_hanja', 'jawon_ohaeng_db']
+  const missing = ['Manseryok','SajuEngine','SURI_DB','HANJA_DB','JAWO_OHAENG_DB']
     .filter(n => typeof window[n] === 'undefined');
   if (missing.length) {
     alert('JS 파일 로드 실패: ' + missing.join(', ') + '\nHTML과 같은 폴더에 JS 파일이 있는지 확인하세요.');
@@ -444,9 +444,8 @@ function syncHR(v) {
 function updHL(h) {
   const el = document.getElementById('hlbl');
   if (h===null||h===undefined) { el.textContent='—'; return; }
-  const n = parseInt(h);
-  const info = JH.find(jh => jh.v.includes(n));
-  el.textContent = info ? `${info.hj}(${info.j}시) · ${info.r}` : '—';
+  const info = JH.find(jh => jh.v.includes(h) || (h===23 && jh.j==='자'));
+  el.textContent = info ? `${info.j}시(${info.hj}) · ${info.r}` : '—';
 }
 
 // ── 음력→양력 근사 변환 ──
@@ -481,17 +480,18 @@ function run() {
 
   const hourArg = G.hour===null ? -1 : G.hour;
 
-  // ── Manseryok로 사주 계산 ──
-  const pillars = Manseryok.getPillars(fy, fm, fd, hourArg);
-
-  // ── SajuEngine.analyze로 용신 도출 ──
+  // ── SajuEngine.analyze (내부에서 Manseryok 사용) ──
   const ana = SajuEngine.analyze(fy, fm, fd, hourArg);
-  // ana.yongsin = [{oh:'목', ss:'인성(印星)'}, ...] 형태
+  // ana.pillars = [{yeonju, wolju, ilju, siju}]
+  // ana.yongsin.yongsin = [{oh:'목', ss:'...'}, ...]
   // ana.dist    = {목:N, 화:N, 토:N, 금:N, 수:N}
 
   // 용신: 첫 번째 항목 사용
   const yongsinOh = ana.yongsin.yongsin[0].oh;   // '목'|'화'|'토'|'금'|'수'
   const yongsinJW = OHJ[yongsinOh];               // '木'|'火'|'土'|'金'|'水'
+
+  // pillars 구조를 renderSaju가 기대하는 형태로 변환
+  const pillars = { yeonju: ana.yeonju, wolju: ana.wolju, ilju: ana.ilju, siju: ana.siju };
 
   renderSaju(pillars, ana.dist, yongsinOh, yongsinJW, ana, lunarMsg);
   genNames(sung, strokes, yongsinJW, ana);
@@ -588,7 +588,25 @@ function genNames(sung, strokes, yongsinJW, ana) {
     const gp = pool.filter(h => h.gender===G.gender || h.gender==='N');
 
     // db_saju.js의 recommendNames() 사용
-    const raw = recommendNames(sung, strokes, yongsinJW, gp);
+    const rawResults = recommendNames(sung, strokes, yongsinJW, gp);
+
+    // 한글 이름 및 eumOhaeng.details 보완
+    const raw = rawResults.map(r => {
+      // char1, char2 찾기 (pool에서 한자 매칭)
+      const hanjaChars = r.hanjaName ? r.hanjaName.split('') : [];
+      const c1 = gp.find(x => x.hanja === hanjaChars[0]);
+      const c2 = gp.find(x => x.hanja === hanjaChars[1]);
+      const kor1 = c1 ? c1.korean : hanjaChars[0];
+      const kor2 = c2 ? c2.korean : hanjaChars[1];
+      const koreanName = sung + kor1 + kor2;
+
+      // eumOhaeng.details 누락 시 빈 배열로 보완
+      const eum = r.eumOhaeng || {};
+      if (!eum.details) eum.details = [];
+      if (!eum.flow) eum.flow = [];
+
+      return { ...r, name: koreanName, eumOhaeng: eum };
+    });
 
     // 점수 정렬
     const ls = {great:3,good:2,neutral:1,bad:0,terrible:-1};
@@ -666,9 +684,9 @@ function showDet(idx) {
   document.getElementById('mdN').textContent = r.name;
   document.getElementById('mdH').textContent = nameBody + ' · ' + r.hanjaName;
 
-  // 한자 정보 검색
-  const chars = [nameBody[0], nameBody[1]];
-  const hInfo = chars.map(c => {
+  // 한자 정보 검색 (hanjaName의 각 한자로 조회)
+  const hanjaChars = r.hanjaName ? r.hanjaName.split('') : ['',''];
+  const hInfo = hanjaChars.map(c => {
     const a = HANJA_DB.find(h=>h.char===c);
     if (a) return a;
     for (const [,lst] of Object.entries(JAWO_OHAENG_DB)) {
@@ -699,7 +717,7 @@ function showDet(idx) {
       <div class="mst">한자 의미</div>
       <div class="hjg">${[0,1].map(i=>{
         const h=hInfo[i]; const el=[e1,e2][i]; const col=OHC[JWO[el]]||'var(--mut)';
-        if(!h) return `<div class="hji"><div class="hjb" style="color:${col}">${chars[i]}</div><div class="hji-t"><strong>${chars[i]}</strong></div></div>`;
+        if(!h) return `<div class="hji"><div class="hjb" style="color:${col}">${hanjaChars[i]}</div><div class="hji-t"><strong>${hanjaChars[i]}</strong></div></div>`;
         const elh=h.element?`오행: <span style="color:${col}">${el}</span><br>`:'';
         return `<div class="hji">
           <div class="hjb" style="color:${col}">${h.char}</div>
