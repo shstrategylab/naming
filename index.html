@@ -99,9 +99,15 @@ select option{background:var(--sur2)}
 /* 사주 원국표 */
 .pt{width:100%;border-collapse:collapse;text-align:center;font-family:'Noto Serif KR',serif;margin-bottom:18px}
 .pt th{padding:8px 5px;font-size:10px;letter-spacing:2px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--bdr)}
-.pt td{padding:10px 5px;border-bottom:1px solid var(--bdr)}
-.pb{font-size:24px;font-weight:600;line-height:1;display:block}
+.pt td{padding:8px 5px;border-bottom:1px solid var(--bdr)}
+.pt .row-lbl{font-size:10px;color:var(--dim);letter-spacing:1px;text-align:left;padding-left:4px;white-space:nowrap}
+.pb{font-size:26px;font-weight:600;line-height:1;display:block}
 .ps{font-size:10px;color:var(--mut);display:block;margin-top:3px}
+.ss-tag{display:inline-block;font-size:10px;padding:2px 7px;border:1px solid currentColor;letter-spacing:.5px;margin-bottom:2px;border-radius:2px}
+.ss-sub{font-size:9px;color:var(--dim);display:block}
+.pt .col-il{background:rgba(201,168,76,.05)}
+.jjg-wrap{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-top:3px}
+.jjg-b{font-size:8px;padding:1px 4px;border:1px solid var(--bdr);color:var(--dim)}
 
 /* 오행 분포 */
 .od{display:flex;flex-direction:column;gap:8px}
@@ -676,37 +682,135 @@ function show(id, cls) { document.getElementById(id).className = cls; }
 
 // ── 사주 원국 렌더 ──
 function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
-  const OHN = SajuEngine.CHEONGAN_OHENG;  // {갑:'목', 을:'목', ...}
-  const SOI = ['목','화','토','금','수'];  // OHENG_NAMES 순서 참조용
-  const cols = [pillars.yeonju, pillars.wolju, pillars.ilju, pillars.siju];
-  const LBL  = ['연주(年柱)','월주(月柱)','일주(日柱)','시주(時柱)'];
 
-  let t = `<table class="pt"><tr><th></th>`;
-  cols.forEach((p,i) => p && (t+=`<th>${LBL[i]}</th>`));
-  t += `</tr>`;
-  ['천간','지지'].forEach((row,ri) => {
-    t += `<tr><td style="font-size:10px;color:var(--dim);letter-spacing:1px">${row}</td>`;
-    cols.forEach(p => {
-      if (!p) return;
-      const oh  = ri===0 ? SajuEngine.CHEONGAN_OHENG[p.gan] : SajuEngine.JIJI_OHENG[p.ji];
-      const col = OHC[oh];
-      const big = ri===0 ? p.ganHJ : p.jiHJ;
-      const sm  = ri===0 ? `${p.gan} · ${oh}(${OHJ[oh]})` : `${p.ji} · ${oh}(${OHJ[oh]})`;
-      t += `<td><span class="pb" style="color:${col}">${big}</span><span class="ps">${sm}</span></td>`;
-    });
-    t += `</tr>`;
+  // ━━ 열 순서: 시·일·월·연 (한국 전통 만세력 표준, 오른쪽이 연주) ━━
+  // 시주가 없으면 3열(일·월·연)로 표시
+  const hasSi = !!pillars.siju;
+  // [시, 일, 월, 연] 순
+  const colDefs = [
+    { key:'siju',   lbl:'시주(時柱)', p: pillars.siju   },
+    { key:'ilju',   lbl:'일주(日柱)', p: pillars.ilju   },
+    { key:'wolju',  lbl:'월주(月柱)', p: pillars.wolju  },
+    { key:'yeonju', lbl:'연주(年柱)', p: pillars.yeonju },
+  ].filter(c => !!c.p);
+
+  const ilIdx = ana.ilju.stemIdx;  // 일간 인덱스 (십신 기준)
+
+  // 십신 색상 매핑
+  const SS_COLOR = {
+    비견:'var(--木)', 겁재:'var(--木)',
+    식신:'var(--火)', 상관:'var(--火)',
+    편재:'var(--土)', 정재:'var(--土)',
+    편관:'var(--金)', 정관:'var(--金)',
+    편인:'var(--水)', 정인:'var(--水)',
+  };
+
+  // 십성 계산 헬퍼 (saju-engine의 함수 활용)
+  function stemSS(stemIdx) {
+    return SajuEngine.getStemSipseong(ilIdx, stemIdx);
+  }
+  function branchSS(branchIdx) {
+    return SajuEngine.getBranchSipseong(ilIdx, branchIdx);
+  }
+
+  // ━━ 원국표 ━━
+  // 행 구성: 십신(천간) / 천간 / 십신(지지) / 지지 / 지장간
+  // 일주 열은 황금 배경 강조
+
+  let t = `<table class="pt">`;
+
+  // 헤더행 (시·일·월·연)
+  t += `<tr><th class="row-lbl"></th>`;
+  colDefs.forEach(c => {
+    const isIl = c.key === 'ilju';
+    t += `<th${isIl?' style="color:var(--gold)"':''}>${c.lbl}</th>`;
   });
+  t += `</tr>`;
+
+  // ① 천간 십신
+  t += `<tr><td class="row-lbl">십신</td>`;
+  colDefs.forEach(c => {
+    const isIl = c.key === 'ilju';
+    if (isIl) {
+      // 일간은 십신 없음 — 일원(日元) 표기
+      t += `<td class="col-il"><span class="ss-tag" style="color:var(--gold);border-color:var(--goldd)">일원(日元)</span></td>`;
+    } else {
+      const ss  = stemSS(c.p.stemIdx);
+      const col = SS_COLOR[ss] || 'var(--mut)';
+      t += `<td><span class="ss-tag" style="color:${col};border-color:${col}">${ss}</span></td>`;
+    }
+  });
+  t += `</tr>`;
+
+  // ② 천간
+  t += `<tr><td class="row-lbl">천간</td>`;
+  colDefs.forEach(c => {
+    const isIl = c.key === 'ilju';
+    const oh   = SajuEngine.CHEONGAN_OHENG[c.p.gan];
+    const col  = OHC[oh];
+    t += `<td${isIl?' class="col-il"':''}>`
+       + `<span class="pb" style="color:${col}">${c.p.ganHJ}</span>`
+       + `<span class="ps">${c.p.gan} · ${oh}(${OHJ[oh]})</span>`
+       + `</td>`;
+  });
+  t += `</tr>`;
+
+  // ③ 지지 십신
+  t += `<tr><td class="row-lbl">십신</td>`;
+  colDefs.forEach(c => {
+    const isIl = c.key === 'ilju';
+    const ss   = branchSS(c.p.branchIdx);
+    const col  = SS_COLOR[ss] || 'var(--mut)';
+    t += `<td${isIl?' class="col-il"':''}>`
+       + `<span class="ss-tag" style="color:${col};border-color:${col}">${ss}</span>`
+       + `</td>`;
+  });
+  t += `</tr>`;
+
+  // ④ 지지
+  t += `<tr><td class="row-lbl">지지</td>`;
+  colDefs.forEach(c => {
+    const isIl = c.key === 'ilju';
+    const oh   = SajuEngine.JIJI_OHENG[c.p.ji];
+    const col  = OHC[oh];
+    t += `<td${isIl?' class="col-il"':''}>`
+       + `<span class="pb" style="color:${col}">${c.p.jiHJ}</span>`
+       + `<span class="ps">${c.p.ji} · ${oh}(${OHJ[oh]})</span>`
+       + `</td>`;
+  });
+  t += `</tr>`;
+
+  // ⑤ 지장간 (정기 위주, 미니 뱃지)
+  t += `<tr><td class="row-lbl" style="font-size:9px">지장간</td>`;
+  colDefs.forEach(c => {
+    const isIl  = c.key === 'ilju';
+    const jiKey = c.p.ji;
+    const jjg   = SajuEngine.JIJANGGAN[jiKey] || [];
+    const badges = jjg.map(item => {
+      const oh  = SajuEngine.CHEONGAN_OHENG[item.gan];
+      const col = OHC[oh];
+      const ss  = stemSS(item.stemIdx);
+      return `<span class="jjg-b" style="border-color:${col};color:${col}" title="${ss}">${item.ganHJ}<span style="color:var(--dim)">${item.type==='j'?'●':item.type==='m'?'◑':'○'}</span></span>`;
+    }).join('');
+    t += `<td${isIl?' class="col-il"':''}><div class="jjg-wrap">${badges}</div></td>`;
+  });
+  t += `</tr>`;
+
   t += `</table>`;
+
+  // 지장간 범례
+  t += `<div style="font-size:9px;color:var(--dim);margin-bottom:10px;letter-spacing:.3px">● 정기 &nbsp;◑ 중기 &nbsp;○ 여기 &nbsp;|&nbsp; 뱃지 hover 시 십신 표시</div>`;
+
   if (lunarMsg) t += `<div class="lunar-w">${lunarMsg}</div>`;
   document.getElementById('oSaju').innerHTML = t;
 
-  // 오행 분포
+  // ━━ 오행 분포 + 용신 ━━
   const total = Object.values(dist).reduce((a,b)=>a+b,0);
   let d = '<div class="od">';
   ['목','화','토','금','수'].forEach(oh => {
-    const n = dist[oh]||0;
+    const n   = dist[oh]||0;
     const pct = total ? (n/total*100).toFixed(0) : 0;
-    const jw = OHJ[oh], col = OHC[oh];
+    const jw  = OHJ[oh], col = OHC[oh];
     d += `<div class="or">
       <span class="ol" style="color:${col}">${jw}(${oh})</span>
       <div class="obg"><div class="obf" style="width:${pct}%;background:${col}"></div></div>
@@ -715,15 +819,23 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
   });
   d += '</div>';
 
-  // 용신 박스
-  const ysCol = OHC[yongsinOh];
+  const ysCol  = OHC[yongsinOh];
   const ysInfo = ana.yongsin.yongsin.map(v=>`${v.oh}(${OHJ[v.oh]}) — ${v.ss}`).join(', ');
+  const heesinInfo = ana.yongsin.heesin?.map(v=>`${v.oh}(${OHJ[v.oh]})`).join(', ') || '';
+  const gisinInfo  = ana.yongsin.gisin?.map(v=>`${v.oh}(${OHJ[v.oh]})`).join(', ')  || '';
+
   d += `<div class="ysbox">
     <div class="ysc" style="color:${ysCol}">${yongsinJW}</div>
-    <div>
+    <div style="flex:1">
       <div class="yst">用神 · 용신</div>
       <div class="ysn" style="color:${ysCol}">${ysInfo}</div>
-      <div class="ysd">신강약: <strong>${ana.shingang.level==='strong'?'신강(身强)':ana.shingang.level==='weak'?'신약(身弱)':'중화(中和)'}</strong> · 격국: <strong>${ana.geokguk}</strong><br>이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충하여 사주 균형을 맞춥니다.</div>
+      <div class="ysd">
+        신강약: <strong>${ana.shingang.level==='strong'?'신강(身强)':ana.shingang.level==='weak'?'신약(身弱)':'중화(中和)'}</strong>
+        &nbsp;·&nbsp; 격국: <strong>${ana.geokguk}</strong><br>
+        ${heesinInfo ? `희신: <span style="color:var(--mut)">${heesinInfo}</span> &nbsp;·&nbsp; ` : ''}
+        ${gisinInfo  ? `기신: <span style="color:var(--bad)">${gisinInfo}</span><br>` : ''}
+        이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충하여 사주 균형을 맞춥니다.
+      </div>
     </div>
   </div>`;
   document.getElementById('oOheng').innerHTML = d;
