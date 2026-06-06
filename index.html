@@ -270,12 +270,7 @@ select option{background:var(--sur2)}
   <div class="fi full">
     <label>출생 시각 — 지지(地支) 기준<span class="ln">모르면 '모름' 선택</span></label>
     <div class="hg" id="hg"></div>
-    <div class="hr">
-      <span style="font-size:10px;color:var(--dim)">숫자 직접 입력:</span>
-      <input type="number" id="iHR" placeholder="0~23" min="0" max="23" oninput="syncHR(this.value)">
-      <span style="font-size:10px;color:var(--dim)">시 →</span>
-      <span id="hlbl">—</span>
-    </div>
+    <input type="hidden" id="iHR"><span id="hlbl" style="display:none"></span>
   </div>
 
 </div>
@@ -365,7 +360,7 @@ const JH = [
 document.addEventListener('DOMContentLoaded', () => {
   buildHG();
   // 모듈 로드 검증
-  const missing = ['manseryok', 'saju-engine', 'db_saju', 'db_hanja', 'jawon_ohaeng_db'];
+  const missing = ['manseryok', 'saju-engine', 'db_saju', 'db_hanja', 'jawon_ohaeng_db']
     .filter(n => typeof window[n] === 'undefined');
   if (missing.length) {
     alert('JS 파일 로드 실패: ' + missing.join(', ') + '\nHTML과 같은 폴더에 JS 파일이 있는지 확인하세요.');
@@ -449,8 +444,9 @@ function syncHR(v) {
 function updHL(h) {
   const el = document.getElementById('hlbl');
   if (h===null||h===undefined) { el.textContent='—'; return; }
-  const info = JH.find(jh => jh.v.includes(h) || (h===23 && jh.j==='자'));
-  el.textContent = info ? `${info.j}시(${info.hj}) · ${info.r}` : '—';
+  const n = parseInt(h);
+  const info = JH.find(jh => jh.v.includes(n));
+  el.textContent = info ? `${info.hj}(${info.j}시) · ${info.r}` : '—';
 }
 
 // ── 음력→양력 근사 변환 ──
