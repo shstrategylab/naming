@@ -365,7 +365,7 @@ const JH = [
 document.addEventListener('DOMContentLoaded', () => {
   buildHG();
   // 모듈 로드 검증
-  const missing = ['Manseryok','SajuEngine','SURI_DB','HANJA_DB','JAWO_OHAENG_DB']
+  const missing = ['manseryok', 'saju-engine', 'db_saju', 'db_hanja', 'jawon_ohaeng_db'];
     .filter(n => typeof window[n] === 'undefined');
   if (missing.length) {
     alert('JS 파일 로드 실패: ' + missing.join(', ') + '\nHTML과 같은 폴더에 JS 파일이 있는지 확인하세요.');
