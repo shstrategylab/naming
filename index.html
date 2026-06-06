@@ -360,8 +360,12 @@ const JH = [
 document.addEventListener('DOMContentLoaded', () => {
   buildHG();
   // 모듈 로드 검증
-  const missing = ['Manseryok','SajuEngine','SURI_DB','HANJA_DB','JAWO_OHAENG_DB']
-    .filter(n => typeof window[n] === 'undefined');
+  const missing = [];
+  try { if (typeof Manseryok === 'undefined') missing.push('manseryok.js'); } catch(e) { missing.push('manseryok.js'); }
+  try { if (typeof SajuEngine === 'undefined') missing.push('saju-engine.js'); } catch(e) { missing.push('saju-engine.js'); }
+  try { if (typeof HANJA_DB === 'undefined') missing.push('db_hanja.js'); } catch(e) { missing.push('db_hanja.js'); }
+  try { if (typeof recommendNames === 'undefined') missing.push('db_saju.js'); } catch(e) { missing.push('db_saju.js'); }
+  try { if (typeof JAWO_OHAENG_DB === 'undefined') missing.push('jawon_ohaeng_db.js'); } catch(e) { missing.push('jawon_ohaeng_db.js'); }
   if (missing.length) {
     alert('JS 파일 로드 실패: ' + missing.join(', ') + '\nHTML과 같은 폴더에 JS 파일이 있는지 확인하세요.');
   }
@@ -482,8 +486,8 @@ function run() {
 
   // ── SajuEngine.analyze (내부에서 Manseryok 사용) ──
   const ana = SajuEngine.analyze(fy, fm, fd, hourArg);
-  // ana.pillars = [{yeonju, wolju, ilju, siju}]
-  // ana.yongsin.yongsin = [{oh:'목', ss:'...'}, ...]
+  // ana = { yeonju, wolju, ilju, siju, pillars, dist, yongsin, shingang, geokguk, ... }
+  // ana.yongsin = { yongsin:[{oh:'목',ss:'...'}, ...], heesin:[...], gisin:[...] }
   // ana.dist    = {목:N, 화:N, 토:N, 금:N, 수:N}
 
   // 용신: 첫 번째 항목 사용
@@ -505,9 +509,8 @@ function show(id, cls) { document.getElementById(id).className = cls; }
 
 // ── 사주 원국 렌더 ──
 function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
-  const OHN = Manseryok.OHENG_NAMES;
-  const SOI = Manseryok.STEM_OHENG_IDX;
-  const BOI = Manseryok.BRANCH_OHENG_IDX;
+  const OHN = SajuEngine.CHEONGAN_OHENG;  // {갑:'목', 을:'목', ...}
+  const SOI = ['목','화','토','금','수'];  // OHENG_NAMES 순서 참조용
   const cols = [pillars.yeonju, pillars.wolju, pillars.ilju, pillars.siju];
   const LBL  = ['연주(年柱)','월주(月柱)','일주(日柱)','시주(時柱)'];
 
@@ -518,7 +521,7 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
     t += `<tr><td style="font-size:10px;color:var(--dim);letter-spacing:1px">${row}</td>`;
     cols.forEach(p => {
       if (!p) return;
-      const oh  = ri===0 ? OHN[SOI[p.stemIdx]] : OHN[BOI[p.branchIdx]];
+      const oh  = ri===0 ? SajuEngine.CHEONGAN_OHENG[p.gan] : SajuEngine.JIJI_OHENG[p.ji];
       const col = OHC[oh];
       const big = ri===0 ? p.ganHJ : p.jiHJ;
       const sm  = ri===0 ? `${p.gan} · ${oh}(${OHJ[oh]})` : `${p.ji} · ${oh}(${OHJ[oh]})`;
