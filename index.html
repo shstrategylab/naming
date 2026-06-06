@@ -1168,8 +1168,10 @@ function genNames(sung, strokes, yongsinJW, ana) {
     // 성별 필터
     const gp = pool.filter(h => h.gender===G.gender || h.gender==='N');
 
-    // db_saju.js의 recommendNames() 사용
-    const rawResults = recommendNames(sung, strokes, yongsinJW, gp);
+    // db_saju.js의 recommendNames() 사용 (희신·기신 전달)
+    const heesinList = ana.yongsin.heesin || [];
+    const gisinList  = ana.yongsin.gisin  || [];
+    const rawResults = recommendNames(sung, strokes, yongsinJW, gp, heesinList, gisinList);
 
     // 한글 이름 및 eumOhaeng.details 보완
     const raw = rawResults.map(r => {
@@ -1188,11 +1190,13 @@ function genNames(sung, strokes, yongsinJW, ana) {
       return { ...r, name: koreanName, eumOhaeng: eum };
     });
 
-    // 점수 정렬
+    // 점수 정렬: 수리오행 4격 점수 + 희신 포함 보너스
     const ls = {great:3,good:2,neutral:1,bad:0,terrible:-1};
     raw.sort((a,b) => {
-      const sa = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[a.suriGeok[k].luck]||0),0);
-      const sb = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[b.suriGeok[k].luck]||0),0);
+      const sa = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[a.suriGeok[k].luck]||0),0)
+               + (a.yongsinMatch.includes('희신') ? 2 : 0);
+      const sb = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[b.suriGeok[k].luck]||0),0)
+               + (b.yongsinMatch.includes('희신') ? 2 : 0);
       return sb-sa;
     });
 
