@@ -88,6 +88,13 @@ const SajuEngine = (() => {
    * 신강/신약 + 격국 조합으로 용신·희신·기신을 자동 도출
    * 오행 인덱스: 0=목 1=화 2=토 3=금 4=수
    * 원칙: 신강 → 설기(식상)·극제(재관) 용신 / 신약 → 인성·비겁 용신
+   *
+   * [보강] 재다신약(財多身弱) / 관다신약(官多身弱) 패턴 선보정
+   *   - 신강으로 분류됐더라도 용신 후보 오행이 사주에 과다(≥3)할 경우
+   *     그 오행은 일간을 돕기보다 오히려 압박하므로 용신 교체
+   *   - 재성 과다: 식상(설기)·인성(보강) 우선
+   *   - 관성 과다: 인성(통관)·비겁(방어) 우선
+   *   - 교체 여부와 사유를 reason 필드로 반환
    */
   function getYongsin(shingangLevel, ilganIdx, geokguk, dist) {
     const oh = OHENG_NAMES; // ['목','화','토','금','수']
@@ -99,11 +106,49 @@ const SajuEngine = (() => {
     const kill = (o) => (o + 3) % 5; // 나를 극하는 것(관성 방향)
     const make = (o) => (o + 4) % 5; // 나를 생하는 것(인성 방향)
 
+    // 오행 개수 (dist가 없을 경우 대비)
+    const cnt = (ohName) => (dist && dist[ohName]) ? dist[ohName] : 0;
+
+    // ── [보강 Step 0] 재다(財多) / 관다(官多) 선보정 ──────────────
+    // 신강·중화 판정이 났더라도 재성 또는 관성 오행이 3개 이상이면
+    // 일간이 실질적으로 압박받는 구조이므로 용신 방향을 먼저 교정한다.
+    let reason = null; // 교정 사유 (없으면 null)
+
+    const jaeOh  = oh[ctrl(myOh)]; // 재성 오행
+    const gwanOh = oh[kill(myOh)]; // 관성 오행
+    const siksOh = oh[gen(myOh)];  // 식상 오행
+    const inOh   = oh[make(myOh)]; // 인성 오행
+    const biOh   = oh[myOh];       // 비겁 오행
+
+    // 재다: 재성 오행이 3개 이상 → 재다신약에 준하는 압박
+    const isJaeDa  = cnt(jaeOh)  >= 3;
+    // 관다: 관성 오행이 3개 이상 → 관다신약에 준하는 압박
+    const isGwanDa = cnt(gwanOh) >= 3;
+
     let yongsin, heesin, gisin, giwoo;
 
-    if (shingangLevel === 'strong') {
-      // 신강: 식상(설기)·재성(극제)·관성(제어) 중 상황에 따라
-      // 격국별 세분화
+    // ── 재다·관다 보정 분기 (신강·중화 공통 적용) ─────────────────
+    if ((shingangLevel === 'strong' || shingangLevel === 'balanced') && isJaeDa) {
+      // 재성이 넘쳐 일간을 역극할 위험
+      // → 식상(설기·재생관 차단)을 1순위, 인성(일간 보강)을 2순위로
+      // → 관성(관다 가중 방지)은 희신에서 제외
+      yongsin = [siksOh, inOh];
+      heesin  = [biOh];
+      gisin   = [jaeOh];
+      giwoo   = gwanOh;
+      reason  = `재성(${jaeOh}) ${cnt(jaeOh)}개 과다 — 재다압박 구조. 식상(${siksOh})·인성(${inOh})으로 균형 조정.`;
+
+    } else if ((shingangLevel === 'strong' || shingangLevel === 'balanced') && isGwanDa) {
+      // 관성이 넘쳐 일간을 극제할 위험
+      // → 인성(통관·완충)을 1순위, 비겁(방어)을 2순위로
+      yongsin = [inOh, biOh];
+      heesin  = [siksOh];
+      gisin   = [gwanOh];
+      giwoo   = jaeOh;
+      reason  = `관성(${gwanOh}) ${cnt(gwanOh)}개 과다 — 관다압박 구조. 인성(${inOh})으로 통관, 비겁(${biOh})으로 방어.`;
+
+    } else if (shingangLevel === 'strong') {
+      // ── 일반 신강 분기 ─────────────────────────────────────────
       if (geokguk === '건록격' || geokguk === '양인격') {
         yongsin = [oh[ctrl(myOh)], oh[kill(myOh)]]; // 재·관
         heesin  = [oh[gen(myOh)]];                  // 식상
@@ -127,20 +172,36 @@ const SajuEngine = (() => {
         gisin   = [oh[myOh], oh[make(myOh)]];
       }
       giwoo = oh[make(myOh)]; // 구신: 인성(기운 더해줌)
+
     } else if (shingangLevel === 'weak') {
-      // 신약: 인성·비겁이 용신
+      // ── 신약 분기 ──────────────────────────────────────────────
       yongsin = [oh[make(myOh)], oh[myOh]];
       heesin  = [oh[gen(myOh)]];
       gisin   = [oh[kill(myOh)], oh[ctrl(myOh)]];
       giwoo   = oh[gen(myOh)];
+
     } else {
-      // 중화: 과다 오행을 설기·억제하는 방향
+      // ── 중화 분기 ─────────────────────────────────────────────
+      // 과다 오행을 설기·억제하는 방향
       const maxOh  = Object.entries(dist).sort((a,b)=>b[1]-a[1])[0][0];
       const maxIdx = OHENG_NAMES.indexOf(maxOh);
       yongsin = [oh[(maxIdx + 2) % 5], oh[(maxIdx + 3) % 5]];
       heesin  = [oh[(maxIdx + 1) % 5]];
       gisin   = [maxOh];
       giwoo   = null;
+    }
+
+    // ── [보강 Step 1] 용신 후보 오행이 사주 내 부재(0개)이면 희신과 교체 ──
+    // 뿌리 없는 용신은 힘을 쓰지 못하므로, 사주에 존재하는 오행 쪽으로 조정
+    if (yongsin.length > 1) {
+      const available = yongsin.filter(o => cnt(o) > 0);
+      const absent    = yongsin.filter(o => cnt(o) === 0);
+      if (available.length > 0 && absent.length > 0 && !reason) {
+        // 부재 용신을 희신으로 강등, 현존 용신만 남김
+        reason = `용신 후보 중 ${absent.join('·')}은 사주 내 부재(0개). 현존 오행(${available.join('·')}) 위주로 조정.`;
+        yongsin = available;
+        heesin  = [...new Set([...heesin, ...absent])];
+      }
     }
 
     // 십성 이름으로 변환
@@ -155,6 +216,7 @@ const SajuEngine = (() => {
       yongsin: yongsin.map(o => ({ oh: o, ss: ohToSs(o) })),
       heesin:  heesin.map(o  => ({ oh: o, ss: ohToSs(o) })),
       gisin:   gisin.map(o   => ({ oh: o, ss: ohToSs(o) })),
+      reason,   // 교정 사유 (null이면 정상 공식 적용)
     };
   }
 
