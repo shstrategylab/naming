@@ -927,8 +927,23 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
       '편재격':'편재(偏財)가 격국을 이루어 활동적이고 사업 감각이 뛰어난 사주입니다.',
       '비겁격':'비겁(比劫)이 강한 격국으로, 독립심과 자존감이 강한 사주입니다.',
     };
-    for (const [k,v] of Object.entries(map)) { if (g.includes(k.slice(0,2))) return v; }
-    return `${g} 격국의 사주입니다. 격국에 맞는 용신을 취용하여 이름에 보충합니다.`;
+    // 격국별 용신 방향 힌트
+    const geokYongsinHint = {
+      '정관': `정관격은 신강이면 재성(정관을 생해주는 오행)이, 신약이면 인성·비겁이 용신이 됩니다.`,
+      '편관': `편관격은 신강이면 식상으로 편관을 제화(制化)하는 것이, 신약이면 인성으로 편관을 통관시키는 것이 이상적입니다.`,
+      '정인': `정인격은 신강이면 재성으로 인성을 억제하는 것이, 신약이면 인성을 더 보강하는 것이 좋습니다.`,
+      '편인': `편인격은 신강이면 재성·관성이, 신약이면 비겁·인성이 용신 후보입니다.`,
+      '식신': `식신격은 신강이면 식신의 기운을 살려 재성으로 흐르게 하는 것이 이상적입니다.`,
+      '상관': `상관격은 신강이면 재성으로 상관의 기운을 설기하는 것이, 신약이면 인성으로 상관을 제어하는 것이 좋습니다.`,
+      '정재': `정재격은 신강이면 재성을 잘 다룰 수 있어 관성으로 흐르는 것이 이상적입니다.`,
+      '편재': `편재격은 신강이면 재성을 활용할 수 있으나, 신약이면 재성이 오히려 부담이 됩니다.`,
+      '비겁': `비겁격(건록·양인)은 신강이 되기 쉬우므로 식상·재성·관성으로 기운을 분산시키는 것이 핵심입니다.`,
+    };
+    let hint = '';
+    for (const [k,v] of Object.entries(geokYongsinHint)) { if (g.includes(k)) { hint = v; break; } }
+
+    for (const [k,v] of Object.entries(map)) { if (g.includes(k.slice(0,2))) return v + (hint ? `<br><span style="color:var(--gold)">→ ${hint}</span>` : ''); }
+    return `${g} 격국의 사주입니다.` + (hint ? `<br><span style="color:var(--gold)">→ ${hint}</span>` : '');
   })();
 
   const ysExplainItems = ana.yongsin.yongsin.map(v => {
@@ -945,24 +960,74 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
       '정인':'일간을 생하는 오행(음양 동일)으로, 지혜·어머니의 사랑·자격운을 의미합니다.',
     };
     const col = OHC[JWO[v.oh]] || 'var(--mut)';
+    // 용신 오행이 사주에 현재 몇 개 있는지
+    const curCount = ana.dist[v.oh] || 0;
+    const curNote = curCount === 0
+      ? `현재 사주에 <strong>${v.oh}(${OHJ[v.oh]})</strong>이 전혀 없어 이름으로 반드시 보충해야 합니다.`
+      : curCount === 1
+      ? `현재 사주에 <strong>${v.oh}(${OHJ[v.oh]})</strong>이 1개로 부족합니다. 이름으로 보강하면 효과적입니다.`
+      : `현재 사주에 <strong>${v.oh}(${OHJ[v.oh]})</strong>이 ${curCount}개 있으나, 용신으로서 이름에 담아 안정시킵니다.`;
     return `<div class="ys-explain-item">
       <div class="ys-explain-item-label">용신 오행</div>
       <div class="ys-explain-item-val" style="color:${col}">${v.oh}(${OHJ[v.oh]}) &nbsp;—&nbsp; ${v.ss}</div>
-      <div class="ys-explain-item-desc">${ssDescMap[v.ss] || v.ss + '의 기운을 용신으로 취합니다.'}</div>
+      <div class="ys-explain-item-desc">${ssDescMap[v.ss] || v.ss + '의 기운을 용신으로 취합니다.'}<br><span style="color:var(--gold)">→ ${curNote}</span></div>
     </div>`;
   }).join('');
 
-  const heesinBlock = heesinInfo ? `<div class="ys-explain-item">
-    <div class="ys-explain-item-label">희신 (喜神)</div>
-    <div class="ys-explain-item-val" style="color:var(--mut)">${heesinInfo}</div>
-    <div class="ys-explain-item-desc">용신을 도와 사주의 균형을 보조하는 오행입니다. 이름에 함께 쓰면 더욱 좋습니다.</div>
-  </div>` : '';
+  const heesinBlock = (() => {
+    if (!heesinInfo) return '';
+    // 희신 오행 목록과 각각의 사주 내 개수
+    const heesinList = ana.yongsin.heesin || [];
+    const heesinDetail = heesinList.map(h => {
+      const cnt = ana.dist[h.oh] || 0;
+      const cntNote = cnt === 0 ? '사주에 없음 — 이름으로 보충 권장' : `사주에 ${cnt}개`;
+      return `${h.oh}(${OHJ[h.oh]}): ${cntNote}`;
+    }).join(' · ');
+    // 용신과 희신의 관계 설명
+    const GENERATE_OH = { 목:'화', 화:'토', 토:'금', 금:'수', 수:'목' };
+    const yongsOh = ana.yongsin.yongsin[0]?.oh;
+    const heesinOhs = heesinList.map(h => h.oh);
+    let relationNote = '';
+    if (yongsOh && heesinOhs.length) {
+      const genByYong = heesinOhs.find(h => GENERATE_OH[h] === yongsOh); // 희신이 용신을 생함
+      const yongGenH  = heesinOhs.find(h => GENERATE_OH[yongsOh] === h); // 용신이 희신을 생함
+      if (genByYong) relationNote = `<strong>${genByYong}(${OHJ[genByYong]})</strong>이 용신 <strong>${yongsOh}(${OHJ[yongsOh]})</strong>을 생(生)해주어 용신의 힘을 키워줍니다.`;
+      else if (yongGenH) relationNote = `용신 <strong>${yongsOh}(${OHJ[yongsOh]})</strong>이 희신 <strong>${yongGenH}(${OHJ[yongGenH]})</strong>을 생(生)하며 좋은 흐름을 만듭니다.`;
+      else relationNote = `용신과 함께 사주의 균형을 보조하는 오행입니다.`;
+    }
+    return `<div class="ys-explain-item">
+      <div class="ys-explain-item-label">희신 (喜神)</div>
+      <div class="ys-explain-item-val" style="color:var(--金)">${heesinInfo}</div>
+      <div class="ys-explain-item-desc">${relationNote}<br><span style="color:var(--dim);font-size:10px">${heesinDetail}</span><br><span style="color:var(--gold)">→ 용신과 함께 이름 한자에 쓰면 더욱 좋습니다.</span></div>
+    </div>`;
+  })();
 
-  const gisinBlock = gisinInfo ? `<div class="ys-explain-item">
-    <div class="ys-explain-item-label">기신 (忌神)</div>
-    <div class="ys-explain-item-val" style="color:var(--bad)">${gisinInfo}</div>
-    <div class="ys-explain-item-desc">사주의 균형을 해치는 오행입니다. 이름에서 가급적 피하는 것이 좋습니다.</div>
-  </div>` : '';
+  const gisinBlock = (() => {
+    if (!gisinInfo) return '';
+    const gisinList = ana.yongsin.gisin || [];
+    // 기신이 용신에 미치는 영향
+    const CONTROL_OH = { 목:'토', 화:'금', 토:'수', 금:'목', 수:'화' }; // A가 B를 극함
+    const yongsOh = ana.yongsin.yongsin[0]?.oh;
+    const gisinOhs = gisinList.map(g => g.oh);
+    let harmNote = '';
+    if (yongsOh && gisinOhs.length) {
+      const killerOh = gisinOhs.find(g => CONTROL_OH[g] === yongsOh); // 기신이 용신을 극함
+      const drainOh  = gisinOhs.find(g => CONTROL_OH[yongsOh] === g); // 기신이 용신을 설기
+      if (killerOh) harmNote = `<strong>${killerOh}(${OHJ[killerOh]})</strong>이 용신 <strong>${yongsOh}(${OHJ[yongsOh]})</strong>을 극(剋)하여 용신의 기운을 직접 손상시킵니다.`;
+      else if (drainOh) harmNote = `<strong>${drainOh}(${OHJ[drainOh]})</strong>이 용신의 기운을 소모시켜 사주 균형을 무너뜨립니다.`;
+      else harmNote = `사주의 흐름을 방해하는 오행으로 이름에서 피해야 합니다.`;
+    }
+    // 기신이 사주에 얼마나 있는지
+    const gisinCountNote = gisinList.map(g => {
+      const cnt = ana.dist[g.oh] || 0;
+      return cnt >= 2 ? `${g.oh}(${OHJ[g.oh]}) ${cnt}개로 이미 과다` : `${g.oh}(${OHJ[g.oh]}) ${cnt}개`;
+    }).join(' · ');
+    return `<div class="ys-explain-item">
+      <div class="ys-explain-item-label">기신 (忌神)</div>
+      <div class="ys-explain-item-val" style="color:var(--bad)">${gisinInfo}</div>
+      <div class="ys-explain-item-desc">${harmNote}<br><span style="color:var(--dim);font-size:10px">${gisinCountNote}</span><br><span style="color:var(--bad)">→ 이름 한자에서 반드시 피해야 할 오행입니다.</span></div>
+    </div>`;
+  })();
 
   d += `<div class="ys-explain">
     <div class="ys-explain-title">用神 풀이 · 해설</div>
