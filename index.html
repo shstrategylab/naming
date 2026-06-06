@@ -482,7 +482,7 @@ function run() {
     lunarMsg = `※ 음력 ${year}.${month}.${day}${G.leap?'(윤)':''} → 양력 약 ${fy}.${fm}.${fd} 변환 (정밀도는 만세력으로 확인 권장)`;
   }
 
-  const hourArg = G.hour===null ? -1 : G.hour;
+  const hourArg = (G.hour === null || G.hour === undefined) ? -1 : G.hour;
 
   // ── SajuEngine.analyze (내부에서 Manseryok 사용) ──
   const ana = SajuEngine.analyze(fy, fm, fd, hourArg);
@@ -490,8 +490,12 @@ function run() {
   // ana.yongsin = { yongsin:[{oh:'목',ss:'...'}, ...], heesin:[...], gisin:[...] }
   // ana.dist    = {목:N, 화:N, 토:N, 금:N, 수:N}
 
-  // 용신: 첫 번째 항목 사용
-  const yongsinOh = ana.yongsin.yongsin[0].oh;   // '목'|'화'|'토'|'금'|'수'
+  // 용신: 첫 번째 항목 사용 (방어 코드: saju-engine 구조 불일치 대비)
+  const yongsinList = ana?.yongsin?.yongsin;
+  if (!yongsinList || !yongsinList.length) {
+    return alert('사주 분석 오류: 용신 데이터를 가져올 수 없습니다.\nsaju-engine.js 파일을 확인해주세요.');
+  }
+  const yongsinOh = yongsinList[0].oh;   // '목'|'화'|'토'|'금'|'수'
   const yongsinJW = OHJ[yongsinOh];               // '木'|'火'|'土'|'金'|'水'
 
   // pillars 구조를 renderSaju가 기대하는 형태로 변환
