@@ -837,11 +837,65 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
   // ━━ 용신 풀이 ━━
   const shinglevel = ana.shingang.level;
   const shingStr   = shinglevel==='strong'?'신강(身强)':shinglevel==='weak'?'신약(身弱)':'중화(中和)';
-  const shingDesc  = shinglevel==='strong'
-    ? '일간(日干)의 기운이 강합니다. 강한 기운을 설기(洩氣)하거나 극제(剋制)하는 오행이 균형을 잡아줍니다.'
-    : shinglevel==='weak'
-    ? '일간(日干)의 기운이 약합니다. 일간을 생(生)하거나 도와주는 오행이 힘을 더해줍니다.'
-    : '일간의 기운이 균형 잡혀 있습니다. 전체적인 오행의 조화를 유지하는 방향으로 이름을 짓습니다.';
+  // ── 신강약 근거 문장 동적 생성 ──
+  // sipseong.detail에서 비겁·인성이 어느 자리에 있는지 추출
+  const shingDesc = (() => {
+    const sp = ana.sipseong;
+    if (!sp) return shingStr + '입니다.';
+
+    const supportStars = ['비견','겁재','편인','정인'];
+    const weakenStars  = ['식신','상관','편재','정재','편관','정관'];
+
+    // 각 십성이 차지한 자리 목록 수집
+    const supportPositions = [];
+    const weakenPositions  = [];
+    supportStars.forEach(s => {
+      (sp.detail[s] || []).forEach(d => supportPositions.push({ star: s, pos: d.pos, weight: d.weight }));
+    });
+    weakenStars.forEach(s => {
+      (sp.detail[s] || []).forEach(d => weakenPositions.push({ star: s, pos: d.pos, weight: d.weight }));
+    });
+
+    // 월지 여부 — 월지는 weight 40으로 가장 영향력이 큼
+    const supportScore = supportStars.reduce((s,k) => s + (sp.score[k]||0), 0);
+    const weakenScore  = weakenStars.reduce((s,k)  => s + (sp.score[k]||0), 0);
+
+    // 주요 자리 설명 (weight 높은 순으로 최대 3개)
+    function topPositions(list) {
+      return [...list]
+        .sort((a,b) => b.weight - a.weight)
+        .slice(0, 3)
+        .map(d => `${d.pos}의 ${d.star}`)
+        .join(', ');
+    }
+
+    // 월지가 비겁/인성인지 관성/재성인지
+    const woljiSupportEntry = supportPositions.find(d => d.pos === '월지(핵심)');
+    const woljiWeakenEntry  = weakenPositions.find(d => d.pos === '월지(핵심)');
+
+    if (shinglevel === 'strong') {
+      const tops = topPositions(supportPositions);
+      const woljiNote = woljiSupportEntry
+        ? `특히 사주의 중심축인 월지에 <strong>${woljiSupportEntry.star}</strong>이 자리하여 일간의 뿌리가 매우 단단합니다.`
+        : '';
+      return `일간을 돕는 비겁·인성(${supportScore}점)이 일간을 소모시키는 식재관(${weakenScore}점)보다 강합니다.`
+        + (tops ? ` ${tops}이 일간의 기운을 지탱합니다.` : '')
+        + (woljiNote ? ' ' + woljiNote : '')
+        + ' 강한 기운을 설기(洩氣)하거나 극제(剋制)하는 오행으로 균형을 잡아야 합니다.';
+    } else if (shinglevel === 'weak') {
+      const tops = topPositions(weakenPositions);
+      const woljiNote = woljiWeakenEntry
+        ? `특히 월지에 <strong>${woljiWeakenEntry.star}</strong>이 자리하여 일간이 소모·극을 받는 압박이 큽니다.`
+        : '';
+      return `일간을 소모시키는 식재관(${weakenScore}점)이 일간을 돕는 비겁·인성(${supportScore}점)보다 강합니다.`
+        + (tops ? ` ${tops}이 일간의 힘을 빼앗습니다.` : '')
+        + (woljiNote ? ' ' + woljiNote : '')
+        + ' 일간을 생(生)하는 인성이나 같은 오행의 비겁으로 힘을 보충해야 합니다.';
+    } else {
+      return `일간을 돕는 비겁·인성(${supportScore}점)과 소모시키는 식재관(${weakenScore}점)이 비슷하게 균형을 이루고 있습니다.`
+        + ' 어느 한쪽으로 치우치지 않아 오행 전체의 조화를 유지하는 이름이 좋습니다.';
+    }
+  })();
 
   const geokDesc = (() => {
     const g = ana.geokguk || '';
