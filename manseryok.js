@@ -182,9 +182,10 @@ const Manseryok = (() => {
 
   /**
    * 입절일 이전 월지 인덱스 (전달 절기 이후 월지)
-   *   1월 이전→자(0), 2월 이전→축(1), 3월 이전→인(2) …
-   *
-   * ※ 원본: [10,11,2,3,4,5,6,7,8,9,10,11]  → 오프셋 오류
+   *   1월 소한 이전  → 전달(12월 대설 이후) 자(0)
+   *   2월 입춘 이전  → 전달(1월 소한 이후)  축(1)
+   *   3월 경칩 이전  → 전달(2월 입춘 이후)  인(2) …
+   *   12월 대설 이전 → 전달(11월 입동 이후) 해(11)
    */
   const MB_BEFORE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
@@ -259,8 +260,11 @@ const Manseryok = (() => {
     const cut = jq[month - 1];
     const mb  = day >= cut ? MB_AFTER[month - 1] : MB_BEFORE[month - 1];
 
-    // 입춘(인월=2) 이전은 아직 전년도 세운 → 전년도 천간 사용
-    const stemYear = mb < 2 ? year - 1 : year;
+    // 전년도 천간을 써야 하는 경우:
+    //   - 축월(mb=1): 1월 소한 이후 ~ 2월 입춘 이전
+    //   - 자월 중 1월(mb=0, month===1): 1월 소한 이전 (전년 12월 대설 이후와 연속)
+    // 12월 대설 이후 자월(mb=0, month===12)은 해당 연도 연간 사용
+    const stemYear = (mb === 1 || (mb === 0 && month === 1)) ? year - 1 : year;
     const yStemIdx = ((stemYear - 4) % 10 + 10) % 10;
 
     const order    = (mb - 2 + 12) % 12;  // 인월(지지 2)부터의 순서
@@ -284,10 +288,15 @@ const Manseryok = (() => {
    * 시주(時柱) — 일간 5호둔법
    * @param {number} hour        0~23 (음수이면 null 반환)
    * @param {number} dayStemIdx  일간 천간 인덱스
+   *
+   * ※ 야자시(23시) 처리:
+   *   - 현재: 정자시론(正子時論) — 23시도 당일 일간 기준으로 시주 계산 (대다수 만세력 기본값)
+   *   - 야자시론(夜子時論) 적용 시: 23시는 익일 일간 기준으로 계산해야 함
+   *     → 적용하려면 hour===23일 때 dayStemIdx를 익일 일간으로 교체 후 호출
    */
   function getSiju(hour, dayStemIdx) {
     if (hour < 0) return null;
-    // 23시 = 야자시 → 지지 인덱스 0
+    // 23시(야자시) → 지지 인덱스 0 (자시), 천간은 당일 일간 기준 (정자시론)
     const branchIdx = hour === 23 ? 0 : Math.floor((hour + 1) / 2);
     const BASE_H    = [0, 2, 4, 6, 8]; // 갑기→갑자, 을경→병자, 병신→무자, 정임→경자, 무계→임자
     const stemIdx   = (BASE_H[dayStemIdx % 5] + branchIdx) % 10;
