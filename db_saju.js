@@ -374,23 +374,44 @@ function checkEumOhaengFlow(name) {
 // ============================================================
 // [버그 수정 완료] 용신 기반 작명 추천 및 통합 파이프라인
 // ============================================================
-function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = []) {
+function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = [], heesinList = [], gisinList = []) {
   const recommendations = [];
 
   // 안전가드: 후보 풀 데이터가 없거나 글자가 너무 적으면 작동 중지
   if (!poolOfNameChars || poolOfNameChars.length < 2) return [];
 
+  // 희신·기신 오행 집합 (한자 오행 기준)
+  const heesinSet = new Set(heesinList.map(h => typeof h === 'string' ? h : h.oh).map(normalizeElement));
+  const gisinSet  = new Set(gisinList.map(g => typeof g === 'string' ? g : g.oh).map(normalizeElement));
+
+  // 한자 char 기준 중복 방지
+  const seenPairs = new Set();
+
   // 1단계: 전체 한자 풀에서 두 글자씩 조합을 생성하며 전수조사
   for (let i = 0; i < poolOfNameChars.length; i++) {
     for (let j = 0; j < poolOfNameChars.length; j++) {
-      if (i === j) continue; // 첫 글자와 둘째 글자가 같은 한자인 경우 중복 제외
-
       const char1 = poolOfNameChars[i];
       const char2 = poolOfNameChars[j];
 
-      // [핵심 보정]: 두 글자 중 최소 한 글자 이상이 용신 오행(자원오행)을 만족하는지 검사
+      // 같은 한자 중복 제외 (인덱스가 아닌 한자 문자 기준)
+      if (char1.hanja === char2.hanja) continue;
+
+      // 한자 쌍 중복 제외 (순서 포함)
+      const pairKey = char1.hanja + char2.hanja;
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+
+      // [핵심 보정 ①]: 두 글자 중 최소 한 글자 이상이 용신 오행(자원오행)을 만족하는지 검사
       const hasYongsin = (char1.element === yongsin) || (char2.element === yongsin);
       if (!hasYongsin) continue; // 용신 보완이 안 되는 조합은 즉시 탈락
+
+      // [핵심 보정 ②]: 기신 오행 한자가 포함된 조합 제외
+      if (gisinSet.size > 0) {
+        if (gisinSet.has(char1.element) || gisinSet.has(char2.element)) continue;
+      }
+
+      // [가산점]: 희신 오행 한자 포함 여부 (필터 아닌 점수 가산)
+      const hasHeesin = heesinSet.size > 0 && (heesinSet.has(char1.element) || heesinSet.has(char2.element));
 
       const fullName    = `${sung}${char1.char}${char2.char}`;     // 한자 조합 (수리오행용)
       const fullNameKor = `${sung}${char1.korean}${char2.korean}`; // 한글 조합 (음령오행용)
@@ -419,7 +440,7 @@ function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = []) {
         name: fullName,
         hanjaName: `${char1.hanja}${char2.hanja}`,
         resourceOhaeng: `${char1.element}·${char2.element}`,
-        yongsinMatch: `용신(${yongsin}) 보완 완료`,
+        yongsinMatch: hasHeesin ? `용신(${yongsin}) + 희신 보완` : `용신(${yongsin}) 보완`,
         eumOhaeng: {
           flow:    eumOhaengResult.flow,
           details: eumOhaengResult.details,   // 상생/상극 상세 설명 (누락 버그 수정)
