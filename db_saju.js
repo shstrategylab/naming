@@ -392,10 +392,11 @@ function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = []) {
       const hasYongsin = (char1.element === yongsin) || (char2.element === yongsin);
       if (!hasYongsin) continue; // 용신 보완이 안 되는 조합은 즉시 탈락
 
-      const fullName = `${sung}${char1.char}${char2.char}`;
+      const fullName    = `${sung}${char1.char}${char2.char}`;     // 한자 조합 (수리오행용)
+      const fullNameKor = `${sung}${char1.korean}${char2.korean}`; // 한글 조합 (음령오행용)
 
-      // [파이프라인 ①]: 발음상 상극이 없는지 음령오행 흐름 체크
-      const eumOhaengResult = checkEumOhaengFlow(fullName);
+      // [파이프라인 ①]: 음령오행 흐름 체크 — 반드시 한글 이름으로 계산해야 초성 추출 가능
+      const eumOhaengResult = checkEumOhaengFlow(fullNameKor);
       if (!eumOhaengResult.isGood) continue; // 발음이 막히면 다음 조합으로 패스
 
       // [파이프라인 ②]: 성씨와 이름 한자 획수를 결합하여 수리오행 4격 계산
@@ -420,7 +421,8 @@ function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = []) {
         resourceOhaeng: `${char1.element}·${char2.element}`,
         yongsinMatch: `용신(${yongsin}) 보완 완료`,
         eumOhaeng: {
-          flow: eumOhaengResult.flow,
+          flow:    eumOhaengResult.flow,
+          details: eumOhaengResult.details,   // 상생/상극 상세 설명 (누락 버그 수정)
           comment: eumOhaengResult.comment
         },
         suriGeok: {
