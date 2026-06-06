@@ -500,6 +500,17 @@ function run() {
   renderSaju(pillars, ana.dist, yongsinOh, yongsinJW, ana, lunarMsg);
   genNames(sung, strokes, yongsinJW, ana);
 
+  // ── 진단 로그 (F12 콘솔에서 확인) ──
+  console.log('=== 사주 진단 ===');
+  console.log('입력:', fy+'.'+fm+'.'+fd, '시각:'+hourArg);
+  console.log('연주:', ana.yeonju.ganHJ+ana.yeonju.jiHJ, '('+ana.yeonju.gan+ana.yeonju.ji+')');
+  console.log('월주:', ana.wolju.ganHJ+ana.wolju.jiHJ, '('+ana.wolju.gan+ana.wolju.ji+')');
+  console.log('일주:', ana.ilju.ganHJ+ana.ilju.jiHJ, '('+ana.ilju.gan+ana.ilju.ji+')');
+  console.log('시주:', ana.siju ? ana.siju.ganHJ+ana.siju.jiHJ+'('+ana.siju.gan+ana.siju.ji+')' : '없음');
+  console.log('오행분포:', JSON.stringify(ana.dist));
+  console.log('격국:', ana.geokguk, '/ 신강약:', ana.shingang.type);
+  console.log('용신:', ana.yongsin.yongsin.map(v=>v.oh).join(', '), '→ 한자:', yongsinJW);
+
   setStep(2);
   show('sInput','hide'); show('sSaju','show'); show('sName','show');
   setTimeout(()=>document.getElementById('sSaju').scrollIntoView({behavior:'smooth'}), 80);
