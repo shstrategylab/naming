@@ -208,6 +208,10 @@ select option{background:var(--sur2)}
 .eum-neu{color:var(--mut);border-color:var(--bdr);background:transparent}
 .eum-fb{color:var(--dim);border-color:var(--dim);background:transparent}
 
+/* 이름 판단기준 범례 */
+.name-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 14px;padding:8px 12px;background:rgba(201,168,76,.04);border:1px solid var(--bdr)}
+.lg-item{font-size:9px;color:var(--dim);display:flex;align-items:center;gap:4px;letter-spacing:.3px}
+
 /* 정격 강조 */
 .sc-jeong{background:rgba(201,168,76,.08);border:1px solid var(--goldd)}
 .sc-jeong .scl{color:var(--goldd)}
@@ -235,6 +239,17 @@ select option{background:var(--sur2)}
 
 /* 정격 모달 강조 */
 .sgi-jeong{border:1px solid var(--goldd);background:rgba(201,168,76,.04)}
+
+/* 이름 카드 상단 레이아웃 */
+.nc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2px}
+.nc-stars{font-size:11px;letter-spacing:1px;flex-shrink:0;margin-top:4px}
+
+/* 이름 한 줄 풀이 */
+.name-summary{font-size:9px;color:var(--mut);margin:5px 0 7px;line-height:1.5;letter-spacing:.2px;padding:4px 6px;background:var(--sur2);border-left:2px solid var(--goldd)}
+
+/* 필터 안내 */
+.filter-guide{font-size:10px;color:var(--dim);line-height:1.6;padding:7px 10px;background:rgba(201,168,76,.04);border:1px solid var(--bdr);margin-bottom:12px}
+.filter-guide strong{color:var(--mut)}
 </style>
 </head>
 <body>
@@ -341,6 +356,11 @@ select option{background:var(--sur2)}
     <div class="rh">
       <div class="ct" style="margin-bottom:0">추천 이름</div>
       <button class="breset" onclick="resetAll()">← 다시 입력</button>
+    </div>
+    <div class="filter-guide">
+      이름에 포함된 <strong>자원오행(한자 오행)</strong> 기준으로 필터합니다.
+      예: 木기운을 누르면 이름 두 글자 중 하나 이상이 木 오행인 이름만 표시됩니다.
+      한 이름이 여러 오행에 중복 집계될 수 있습니다.
     </div>
     <div class="fr" id="fr"></div>
     <div class="si" id="si"></div>
@@ -1385,21 +1405,36 @@ function genNames(sung, strokes, yongsinJW, ana) {
     `<div class="ld"><div class="sp"></div><p>이름 조합 분석 중…</p></div>`;
 
   setTimeout(() => {
-    // HANJA_DB + JAWO_OHAENG_DB 통합
+    // HANJA_DB + JAWO_OHAENG_DB 통합 — 모든 element를 한자 오행으로 정규화
     const pool = [];
     const seen = new Set();
+
+    // normalizeElement가 db_saju.js에 정의돼 있으나, 혹시 미로드 시 대비 인라인 보조
+    const normEl = (typeof normalizeElement === 'function')
+      ? normalizeElement
+      : (e => ({'Water':'水','Fire':'火','Wood':'木','Metal':'金','Earth':'土',
+                '水':'水','火':'火','木':'木','金':'金','土':'土'}[e] || e));
+
     HANJA_DB.forEach(h => {
-      const el = h.element==='Water'?'水':h.element;
-      const k = h.char+el;
-      if (!seen.has(k)) { seen.add(k); pool.push({char:h.char,korean:h.korean,strokes:h.strokes,element:el,meaning:h.meaning,gender:h.gender,hanja:h.char}); }
+      const el = normEl(h.element);  // 'Water' → '水', 'Wood' → '木' 등 전면 정규화
+      if (!el || !['木','火','土','金','水'].includes(el)) return; // 오행 아닌 항목 제외
+      const k = h.char + el;
+      if (!seen.has(k)) {
+        seen.add(k);
+        pool.push({char:h.char, korean:h.korean, strokes:h.strokes, element:el,
+                   meaning:h.meaning, gender:h.gender, hanja:h.char});
+      }
     });
-    Object.entries(JAWO_OHAENG_DB).forEach(([el,list]) => {
+    Object.entries(JAWO_OHAENG_DB).forEach(([rawEl, list]) => {
+      const el = normEl(rawEl); // key도 정규화
+      if (!['木','火','土','金','水'].includes(el)) return;
       list.forEach(item => {
-        const k = item.char+el;
+        const k = item.char + el;
         if (!seen.has(k)) {
           seen.add(k);
           const parts = item.kor.split(' ');
-          pool.push({char:item.char,korean:parts[parts.length-1],strokes:item.stroke,element:el,meaning:item.meaning,gender:'N',hanja:item.char});
+          pool.push({char:item.char, korean:parts[parts.length-1], strokes:item.stroke,
+                     element:el, meaning:item.meaning, gender:'N', hanja:item.char});
         }
       });
     });
@@ -1439,26 +1474,105 @@ function genNames(sung, strokes, yongsinJW, ana) {
 
 // ── 이름 목록 렌더 ──
 const PAGE_SIZE = 24;
+
+// 오행 필터 헬퍼 — '木·水' 에서 해당 오행이 포함된지 정확히 판별
+// el=null → 전체, el='木' → 木이 1개 이상 포함된 이름만
+function matchesFilter(r, el) {
+  if (!el) return true;
+  const parts = r.resourceOhaeng.split('·');
+  return parts.includes(el);
+}
+
+// 이름 한 줄 풀이 생성 — 판단 기준 3가지(수리·음령·오행)를 자연어로 요약
+function makeNameSummary(r) {
+  const sg        = r.suriGeok;
+  const eumScore  = r.eumOhaeng?.score ?? 0;
+  const isFallback = r.strictMode === false;
+
+  // ① 수리오행(정격) 평가
+  const jeongLuck = sg.jeong.luck;
+  const jeongVal  = sg.jeong.value;
+  const jeongTxt  =
+    jeongLuck === 'great'   ? `전체 획수 ${jeongVal}수 대길(★)` :
+    jeongLuck === 'good'    ? `전체 획수 ${jeongVal}수 길` :
+    jeongLuck === 'neutral' ? `전체 획수 ${jeongVal}수 평범` :
+                              `전체 획수 ${jeongVal}수 주의`;
+
+  // ② 음령오행(발음) 평가
+  const eumTxt =
+    eumScore >= 6 ? '발음 상생 흐름 우수' :
+    eumScore >= 3 ? '발음 흐름 양호' :
+                   '발음 흐름 보통';
+
+  // ③ 오행 보완 평가
+  const bothYongsin = r.yongsinMatch?.includes('양글자');
+  const hasHeesin   = r.yongsinMatch?.includes('희신');
+  const ohaengTxt   =
+    bothYongsin ? '두 글자 모두 용신 오행 ✦' :
+    hasHeesin   ? '용신+희신 오행 보완' :
+                  '용신 오행 보완';
+
+  // ④ 4격 전체 길 여부
+  const allGood = ['won','hyeong','i','jeong'].every(k =>
+    sg[k].luck === 'great' || sg[k].luck === 'good');
+  const allGoodTxt = allGood ? ' · 4격 모두 길 ✦' : '';
+
+  const fallTxt = isFallback ? ' · [완화적용]' : '';
+
+  return `${jeongTxt} &nbsp;·&nbsp; ${eumTxt} &nbsp;·&nbsp; ${ohaengTxt}${allGoodTxt}${fallTxt}`;
+}
+
+// 종합 별점 (★ 1~5)
+function makeStars(r) {
+  const score = r.totalScore || 0;
+  // totalScore 범위: 이론상 최고 ~25(엄격), 완화는 -5
+  const stars = score >= 20 ? 5
+    : score >= 14 ? 4
+    : score >= 8  ? 3
+    : score >= 2  ? 2
+    : 1;
+  return '★'.repeat(stars) + '☆'.repeat(5 - stars);
+}
+
 function renderNames(list, page = 1) {
   const allEl = ['木','火','土','金','水'];
   const strictCount   = list.filter(r => r.strictMode !== false).length;
   const fallbackCount = list.length - strictCount;
 
-  let fr = `<button class="fb on" onclick="filterE(null,this)">전체 (${list.length})</button>`;
+  // 필터 버튼: 각 오행별 이름 수 집계 + 의미 레이블
+  const elLabel = {'木':'木(나무)','火':'火(불)','土':'土(흙)','金':'金(쇠)','水':'水(물)'};
+  let fr = `<button class="fb on" onclick="filterE(null,this)">전체 (${list.length}개)</button>`;
   allEl.forEach(el => {
-    const cnt = list.filter(r=>r.resourceOhaeng.includes(el)).length;
-    if (cnt) fr += `<button class="fb" onclick="filterE('${el}',this)">${el} ${cnt}</button>`;
+    const cnt = list.filter(r => matchesFilter(r, el)).length;
+    if (cnt > 0)
+      fr += `<button class="fb" onclick="filterE('${el}',this)" title="${el} 오행 한자가 포함된 이름">${elLabel[el]} ${cnt}개</button>`;
   });
   document.getElementById('fr').innerHTML = fr;
 
   let siText = list.length
-    ? `총 ${list.length}개 · 종합점수순 (수리오행4격·음령오행·용신희신 종합)`
+    ? `총 ${list.length}개 · 종합점수순 — ★많을수록 좋은 이름`
     : '';
   if (fallbackCount > 0 && strictCount > 0)
-    siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">★완화 ${fallbackCount}개 포함</span>`;
+    siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">[완화] ${fallbackCount}개 포함</span>`;
   else if (fallbackCount > 0 && strictCount === 0)
     siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">완화 모드 결과</span>`;
+
+  // 판단기준 범례
+  const legend = `<div class="name-legend">
+    <span class="lg-item"><span style="color:var(--gold)">★★★★★</span> 종합점수 (수리·음령·오행 합산)</span>
+    <span class="lg-item"><span style="color:var(--gold)">정격★</span> 가장 중요한 격 (이름 전체 획수)</span>
+    <span class="lg-item"><span style="color:var(--good)">음령◎</span> 발음 상생 흐름</span>
+    <span class="lg-item"><span style="color:var(--金)">오행배지</span> 이름 한자의 자원오행</span>
+  </div>`;
   document.getElementById('si').innerHTML = siText;
+  // 범례 삽입 (최초 1회)
+  let lgEl = document.getElementById('nameLegend');
+  if (!lgEl) {
+    lgEl = document.createElement('div');
+    lgEl.id = 'nameLegend';
+    document.getElementById('si').insertAdjacentElement('afterend', lgEl);
+  }
+  lgEl.innerHTML = legend;
 
   if (!list.length) {
     document.getElementById('oName').innerHTML =
@@ -1474,28 +1588,35 @@ function renderNames(list, page = 1) {
   let h = '<div class="ng">';
   pageItems.forEach((r, idx) => {
     const globalIdx = (curPage - 1) * PAGE_SIZE + idx;
-    const [e1,e2] = r.resourceOhaeng.split('·');
+    const [e1,e2]  = r.resourceOhaeng.split('·');
     const nameBody = r.name.slice(1);
     const eumScore = r.eumOhaeng?.score ?? 0;
     const eumBadge = eumScore >= 6
       ? `<span class="eum-badge eum-great">음령◎</span>`
       : eumScore >= 3
       ? `<span class="eum-badge eum-good">음령○</span>`
-      : eumScore >= 0
-      ? `<span class="eum-badge eum-neu">음령△</span>`
-      : '';
+      : `<span class="eum-badge eum-neu">음령△</span>`;
     const fallbackBadge = r.strictMode === false
-      ? `<span class="eum-badge eum-fb">★완화</span>`
+      ? `<span class="eum-badge eum-fb">완화</span>`
       : '';
+    const stars   = makeStars(r);
+    const summary = makeNameSummary(r);
+    const starColor = (r.totalScore||0) >= 14 ? 'var(--gold)' : 'var(--dim)';
+
     h += `<div class="nc" onclick="showDet(${globalIdx},event)">
-      <div class="nk">${nameBody} <span class="nh">${r.hanjaName}</span></div>
-      <div class="nfull">${r.name} / ${r.hanjaName}</div>
+      <div class="nc-top">
+        <div>
+          <div class="nk">${nameBody} <span class="nh">${r.hanjaName}</span></div>
+          <div class="nfull">${r.name} / ${r.hanjaName}</div>
+        </div>
+        <div class="nc-stars" style="color:${starColor}">${stars}</div>
+      </div>
       <div class="nbs">
         <span class="ob ob-${e1}">${e1}</span>
         <span class="ob ob-${e2}">${e2}</span>
         ${eumBadge}${fallbackBadge}
-        <span style="font-size:9px;color:var(--dim);margin-left:3px">${r.yongsinMatch}</span>
       </div>
+      <div class="name-summary">${summary}</div>
       <div class="sr">
         ${['won','hyeong','i','jeong'].map((k,ki)=>{
           const lb=['원격','형격','이격','정격'][ki];
@@ -1524,13 +1645,12 @@ function renderNames(list, page = 1) {
   }
 
   document.getElementById('oName').innerHTML = h;
-  // 현재 페이지 저장
   G.currentPage = curPage;
   setStep(3);
 }
 
 function changePage(p) {
-  const list = G.filterEl ? G.results.filter(r=>r.resourceOhaeng.includes(G.filterEl)) : G.results;
+  const list = G.filterEl ? G.results.filter(r => matchesFilter(r, G.filterEl)) : G.results;
   renderNames(list, p);
   document.getElementById('sName').scrollIntoView({behavior:'smooth'});
 }
@@ -1539,13 +1659,14 @@ function filterE(el, btn) {
   G.filterEl = el;
   document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
-  renderNames(el ? G.results.filter(r=>r.resourceOhaeng.includes(el)) : G.results, 1);
+  const filtered = el ? G.results.filter(r => matchesFilter(r, el)) : G.results;
+  renderNames(filtered, 1);
 }
 
 // ── 상세 모달 ──
 function showDet(idx, e) {
   if (e) e.stopPropagation();
-  const list = G.filterEl ? G.results.filter(r=>r.resourceOhaeng.includes(G.filterEl)) : G.results;
+  const list = G.filterEl ? G.results.filter(r => matchesFilter(r, G.filterEl)) : G.results;
   const r = list[idx]; if (!r) return;
   const [e1,e2] = r.resourceOhaeng.split('·');
   const nameBody = r.name.slice(1);
