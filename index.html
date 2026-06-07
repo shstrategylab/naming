@@ -200,6 +200,41 @@ select option{background:var(--sur2)}
 
 /* 토글 */
 .hide{display:none}.show{display:block;animation:fu .3s ease}
+
+/* 음령오행 배지 */
+.eum-badge{display:inline-flex;padding:1px 5px;font-size:8px;border:1px solid currentColor;letter-spacing:.3px;margin-left:2px}
+.eum-great{color:var(--good);border-color:rgba(74,171,109,.4);background:rgba(74,171,109,.08)}
+.eum-good{color:var(--goldl);border-color:rgba(226,196,122,.4);background:rgba(226,196,122,.06)}
+.eum-neu{color:var(--mut);border-color:var(--bdr);background:transparent}
+.eum-fb{color:var(--dim);border-color:var(--dim);background:transparent}
+
+/* 정격 강조 */
+.sc-jeong{background:rgba(201,168,76,.08);border:1px solid var(--goldd)}
+.sc-jeong .scl{color:var(--goldd)}
+
+/* 페이지네이션 */
+.pag{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:20px;flex-wrap:wrap}
+.pab{background:var(--bg);border:1px solid var(--bdr);color:var(--mut);padding:6px 11px;font-size:11px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .2s}
+.pab:hover{border-color:var(--goldd);color:var(--gold)}
+.pab-on{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.07)}
+
+/* 종합점수 박스 */
+.score-summary{background:var(--bg);border:1px solid var(--bdr);padding:14px}
+.scr-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:11px}
+.scr-row:last-child{border-bottom:none}
+.scr-lbl{width:130px;flex-shrink:0;color:var(--mut)}
+.scr-val{font-family:'Noto Serif KR',serif;font-size:15px;font-weight:600;width:38px;text-align:right;flex-shrink:0}
+.scr-note{font-size:9px;color:var(--dim);flex:1}
+.scr-total{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--goldd);font-size:11px;color:var(--mut)}
+
+/* 오행보완 현황 */
+.oh-summary{background:var(--bg);border:1px solid var(--bdr);padding:12px;display:flex;flex-direction:column;gap:8px}
+.oh-row{display:flex;align-items:center;gap:10px;font-size:11px}
+.oh-lbl{width:120px;flex-shrink:0;color:var(--mut)}
+.oh-val{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+
+/* 정격 모달 강조 */
+.sgi-jeong{border:1px solid var(--goldd);background:rgba(201,168,76,.04)}
 </style>
 </head>
 <body>
@@ -234,7 +269,7 @@ select option{background:var(--sur2)}
 
   <div class="fi">
     <label>성씨 한자 획수<span class="ln">漢字 기준</span></label>
-    <input type="number" id="iStr" min="1" max="40" placeholder="金→8  李→7  朴→6">
+    <input type="number" id="iStr" min="1" max="40" placeholder="金→8  李→7  朴→6" oninput="validateStroke()">
     <div class="sh" id="shint"></div>
   </div>
 
@@ -333,7 +368,7 @@ select option{background:var(--sur2)}
 // ════════════════════════════════════════════════
 // 전역 상태
 // ════════════════════════════════════════════════
-const G = { gender:'M', cal:'solar', leap:false, hour:null, results:[], filterEl:null };
+const G = { gender:'M', cal:'solar', leap:false, hour:null, results:[], filterEl:null, currentPage:1 };
 
 // ── 오행 색상/한자 매핑 ──
 const OHC = {목:'var(--木)',화:'var(--火)',토:'var(--土)',금:'var(--金)',수:'var(--水)'};
@@ -432,7 +467,35 @@ function pickS(k,h,s) {
   document.getElementById('iS').value=k;
   document.getElementById('iStr').value=s;
   document.getElementById('acl').style.display='none';
-  document.getElementById('shint').textContent=`${k}(${h}) — 한자 ${s}획`;
+  document.getElementById('shint').textContent=`${k}(${h}) — 한자 ${s}획 ✓ 자동검증완료`;
+  document.getElementById('shint').style.color='var(--good)';
+  document.getElementById('iStr').dataset.verified = '1';
+  document.getElementById('iStr').dataset.verifiedVal = s;
+}
+
+// 획수 입력 시 SDB 대조 검증
+function validateStroke() {
+  const sung = document.getElementById('iS').value.trim();
+  const strEl = document.getElementById('iStr');
+  const hint  = document.getElementById('shint');
+  const entered = parseInt(strEl.value);
+  if (!sung || isNaN(entered)) { hint.textContent=''; hint.style.color=''; return; }
+  const match = SDB.find(s => s.k === sung || s.k === sung[0]);
+  if (!match) {
+    hint.textContent = `'${sung}' 성씨 DB에 없음 — 획수를 직접 확인 후 입력하세요`;
+    hint.style.color = 'var(--mut)';
+    strEl.dataset.verified = '0';
+    return;
+  }
+  if (match.s === entered) {
+    hint.textContent = `${match.k}(${match.h}) ${match.s}획 ✓ 일치`;
+    hint.style.color = 'var(--good)';
+    strEl.dataset.verified = '1';
+  } else {
+    hint.textContent = `⚠ ${match.k}(${match.h}) 표준획수는 ${match.s}획 — 지금 입력: ${entered}획. 다른 한자를 쓰는 경우 그대로 진행하세요.`;
+    hint.style.color = 'var(--gold)';
+    strEl.dataset.verified = '2'; // 경고이지만 통과
+  }
 }
 
 // ── 지지 시각 그리드 ──
@@ -1366,15 +1429,8 @@ function genNames(sung, strokes, yongsinJW, ana) {
       return { ...r, name: koreanName, eumOhaeng: eum };
     });
 
-    // 점수 정렬: 수리오행 4격 점수 + 희신 포함 보너스
-    const ls = {great:3,good:2,neutral:1,bad:0,terrible:-1};
-    raw.sort((a,b) => {
-      const sa = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[a.suriGeok[k].luck]||0),0)
-               + (a.yongsinMatch.includes('희신') ? 2 : 0);
-      const sb = ['won','hyeong','i','jeong'].reduce((s,k)=>s+(ls[b.suriGeok[k].luck]||0),0)
-               + (b.yongsinMatch.includes('희신') ? 2 : 0);
-      return sb-sa;
-    });
+    // 점수 정렬: db_saju.js의 totalScore 사용 (수리오행4격가중치 + 음령오행 + 용신/희신 보너스)
+    raw.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
     G.results = raw;
     renderNames(raw);
@@ -1382,16 +1438,27 @@ function genNames(sung, strokes, yongsinJW, ana) {
 }
 
 // ── 이름 목록 렌더 ──
-function renderNames(list) {
+const PAGE_SIZE = 24;
+function renderNames(list, page = 1) {
   const allEl = ['木','火','土','金','水'];
+  const strictCount   = list.filter(r => r.strictMode !== false).length;
+  const fallbackCount = list.length - strictCount;
+
   let fr = `<button class="fb on" onclick="filterE(null,this)">전체 (${list.length})</button>`;
   allEl.forEach(el => {
     const cnt = list.filter(r=>r.resourceOhaeng.includes(el)).length;
     if (cnt) fr += `<button class="fb" onclick="filterE('${el}',this)">${el} ${cnt}</button>`;
   });
   document.getElementById('fr').innerHTML = fr;
-  document.getElementById('si').textContent =
-    list.length ? `총 ${list.length}개 · 수리오행 4격 점수순` : '';
+
+  let siText = list.length
+    ? `총 ${list.length}개 · 종합점수순 (수리오행4격·음령오행·용신희신 종합)`
+    : '';
+  if (fallbackCount > 0 && strictCount > 0)
+    siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">★완화 ${fallbackCount}개 포함</span>`;
+  else if (fallbackCount > 0 && strictCount === 0)
+    siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">완화 모드 결과</span>`;
+  document.getElementById('si').innerHTML = siText;
 
   if (!list.length) {
     document.getElementById('oName').innerHTML =
@@ -1400,23 +1467,41 @@ function renderNames(list) {
     setStep(3); return;
   }
 
+  const totalPages = Math.ceil(list.length / PAGE_SIZE);
+  const curPage    = Math.max(1, Math.min(page, totalPages));
+  const pageItems  = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+
   let h = '<div class="ng">';
-  list.slice(0,48).forEach((r,idx) => {
+  pageItems.forEach((r, idx) => {
+    const globalIdx = (curPage - 1) * PAGE_SIZE + idx;
     const [e1,e2] = r.resourceOhaeng.split('·');
-    const nameBody = r.name.slice(1); // 성 제거
-    h += `<div class="nc" onclick="showDet(${idx})">
+    const nameBody = r.name.slice(1);
+    const eumScore = r.eumOhaeng?.score ?? 0;
+    const eumBadge = eumScore >= 6
+      ? `<span class="eum-badge eum-great">음령◎</span>`
+      : eumScore >= 3
+      ? `<span class="eum-badge eum-good">음령○</span>`
+      : eumScore >= 0
+      ? `<span class="eum-badge eum-neu">음령△</span>`
+      : '';
+    const fallbackBadge = r.strictMode === false
+      ? `<span class="eum-badge eum-fb">★완화</span>`
+      : '';
+    h += `<div class="nc" onclick="showDet(${globalIdx},event)">
       <div class="nk">${nameBody} <span class="nh">${r.hanjaName}</span></div>
       <div class="nfull">${r.name} / ${r.hanjaName}</div>
       <div class="nbs">
         <span class="ob ob-${e1}">${e1}</span>
         <span class="ob ob-${e2}">${e2}</span>
+        ${eumBadge}${fallbackBadge}
         <span style="font-size:9px;color:var(--dim);margin-left:3px">${r.yongsinMatch}</span>
       </div>
       <div class="sr">
         ${['won','hyeong','i','jeong'].map((k,ki)=>{
           const lb=['원격','형격','이격','정격'][ki];
           const v=r.suriGeok[k];
-          return `<div class="sc"><span class="scl">${lb}</span>
+          const isJeong = k==='jeong';
+          return `<div class="sc${isJeong?' sc-jeong':''}"><span class="scl">${lb}${isJeong?'★':''}</span>
             <span class="scn lg-${v.luck}">${v.value}</span>
             <span class="sck lg-${v.luck}">${LKL[v.luck]||''}</span></div>`;
         }).join('')}
@@ -1424,19 +1509,42 @@ function renderNames(list) {
     </div>`;
   });
   h += '</div>';
+
+  // 페이지네이션
+  if (totalPages > 1) {
+    h += `<div class="pag">`;
+    if (curPage > 1)
+      h += `<button class="pab" onclick="changePage(${curPage-1})">‹ 이전</button>`;
+    for (let p = 1; p <= totalPages; p++) {
+      h += `<button class="pab${p===curPage?' pab-on':''}" onclick="changePage(${p})">${p}</button>`;
+    }
+    if (curPage < totalPages)
+      h += `<button class="pab" onclick="changePage(${curPage+1})">다음 ›</button>`;
+    h += `</div>`;
+  }
+
   document.getElementById('oName').innerHTML = h;
+  // 현재 페이지 저장
+  G.currentPage = curPage;
   setStep(3);
+}
+
+function changePage(p) {
+  const list = G.filterEl ? G.results.filter(r=>r.resourceOhaeng.includes(G.filterEl)) : G.results;
+  renderNames(list, p);
+  document.getElementById('sName').scrollIntoView({behavior:'smooth'});
 }
 
 function filterE(el, btn) {
   G.filterEl = el;
   document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
-  renderNames(el ? G.results.filter(r=>r.resourceOhaeng.includes(el)) : G.results);
+  renderNames(el ? G.results.filter(r=>r.resourceOhaeng.includes(el)) : G.results, 1);
 }
 
 // ── 상세 모달 ──
-function showDet(idx) {
+function showDet(idx, e) {
+  if (e) e.stopPropagation();
   const list = G.filterEl ? G.results.filter(r=>r.resourceOhaeng.includes(G.filterEl)) : G.results;
   const r = list[idx]; if (!r) return;
   const [e1,e2] = r.resourceOhaeng.split('·');
@@ -1486,14 +1594,68 @@ function showDet(idx) {
       }).join('')}</div>
     </div>
     <div class="ms">
+      <div class="mst">종합 평가</div>
+      <div class="score-summary">
+        ${(() => {
+          const sg = r.suriGeok;
+          const suriScore = (typeof calcSuriScore === 'function') ? calcSuriScore({
+            wonGeok: sg.won.value, hyeongGeok: sg.hyeong.value,
+            iGeok: sg.i.value, jeongGeok: sg.jeong.value
+          }) : '—';
+          const eumScore  = r.eumOhaeng?.score ?? '—';
+          const total     = r.totalScore ?? '—';
+          const isFallback = r.strictMode === false;
+          const yongsinCols = r.yongsinMatch || '';
+          const bothYongsin = yongsinCols.includes('양글자');
+          const hasHeesin   = yongsinCols.includes('희신');
+          return `
+            <div class="scr-row">
+              <span class="scr-lbl">수리오행 4격 점수</span>
+              <span class="scr-val" style="color:var(--gold)">${suriScore}점</span>
+              <span class="scr-note">정격(★) 2배 가중</span>
+            </div>
+            <div class="scr-row">
+              <span class="scr-lbl">음령오행 흐름 점수</span>
+              <span class="scr-val" style="color:${eumScore>=6?'var(--good)':eumScore>=3?'var(--goldl)':'var(--mut)'}">${eumScore}점</span>
+              <span class="scr-note">상생+3 / 동기+2 / 상극-3</span>
+            </div>
+            <div class="scr-row">
+              <span class="scr-lbl">용신·희신 보너스</span>
+              <span class="scr-val" style="color:var(--gold)">${bothYongsin?'+3':hasHeesin?'+2':'+0'}</span>
+              <span class="scr-note">${bothYongsin?'두 글자 모두 용신':hasHeesin?'희신 포함':'용신 1글자'}</span>
+            </div>
+            ${isFallback?`<div class="scr-row"><span class="scr-lbl">완화 모드</span><span class="scr-val" style="color:var(--mut)">-5</span><span class="scr-note">엄격 기준 미통과</span></div>`:''}
+            <div class="scr-total"><span>종합 점수</span><span style="color:var(--gold);font-size:20px;font-family:'Noto Serif KR',serif">${total}점</span></div>
+          `;
+        })()}
+      </div>
+    </div>
+    <div class="ms">
       <div class="mst">수리오행 사격 (四格)</div>
       <div class="sgg">${['won','hyeong','i','jeong'].map((k,ki)=>{
-        const lbl=['원격(元格) 성+이름1','형격(亨格) 이름1+이름2','이격(利格) 성+이름2','정격(貞格) 전체'][ki];
+        const lbl=['원격(元格) 성+이름1','형격(亨格) 이름1+이름2','이격(利格) 성+이름2','정격(貞格) 전체★'][ki];
         const v=r.suriGeok[k];
-        return `<div class="sgi"><div class="sgl">${lbl}</div>
+        const isJ = k==='jeong';
+        return `<div class="sgi${isJ?' sgi-jeong':''}"><div class="sgl">${lbl}</div>
           <div class="sgn lg-${v.luck}">${v.value} <span style="font-size:12px">${LKL[v.luck]||''}</span></div>
           <div class="sgm">${v.meaning||''}</div></div>`;
       }).join('')}</div>
+    </div>
+    <div class="ms">
+      <div class="mst">오행 보완 현황</div>
+      <div class="oh-summary">
+        <div class="oh-row">
+          <span class="oh-lbl">자원오행(이름 한자)</span>
+          <span class="oh-val">
+            <span class="ob ob-${e1}">${e1}</span>
+            <span class="ob ob-${e2}">${e2}</span>
+          </span>
+        </div>
+        <div class="oh-row">
+          <span class="oh-lbl">용신/희신 매칭</span>
+          <span class="oh-val" style="font-size:11px;color:var(--gold)">${r.yongsinMatch}</span>
+        </div>
+      </div>
     </div>
     <div class="ms">
       <div class="mst">음령오행 흐름</div>
@@ -1510,7 +1672,7 @@ function closeMd() {
   document.body.style.overflow = '';
 }
 function resetAll() {
-  G.hour=null; G.filterEl=null; G.results=[];
+  G.hour=null; G.filterEl=null; G.results=[]; G.currentPage=1;
   show('sInput','show'); show('sSaju','hide'); show('sName','hide');
   setStep(1);
   window.scrollTo({top:0,behavior:'smooth'});
