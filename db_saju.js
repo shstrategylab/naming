@@ -372,96 +372,176 @@ function checkEumOhaengFlow(name) {
 }
 
 // ============================================================
-// [버그 수정 완료] 용신 기반 작명 추천 및 통합 파이프라인
+// 수리오행 4격 luck → 점수 변환
+// 정격(전체획수)에 2배 가중치 부여 — 이름 전체 운세를 가장 잘 대변하기 때문
+// ============================================================
+const SURI_LUCK_SCORE = { great: 4, good: 3, neutral: 2, bad: 0, terrible: -2 };
+
+function calcSuriScore(suriGeok) {
+  const wonLuck    = SURI_DB[suriGeok.wonGeok]?.luck    || 'neutral';
+  const hyeongLuck = SURI_DB[suriGeok.hyeongGeok]?.luck || 'neutral';
+  const iLuck      = SURI_DB[suriGeok.iGeok]?.luck      || 'neutral';
+  const jeongLuck  = SURI_DB[suriGeok.jeongGeok]?.luck  || 'neutral';
+  // 정격 × 2 가중치
+  return (SURI_LUCK_SCORE[wonLuck] || 0)
+       + (SURI_LUCK_SCORE[hyeongLuck] || 0)
+       + (SURI_LUCK_SCORE[iLuck] || 0)
+       + (SURI_LUCK_SCORE[jeongLuck] || 0) * 2;
+}
+
+// 음령오행 흐름 점수 (상생/동기 단계 수 기반)
+function calcEumScore(eumResult) {
+  if (!eumResult || !eumResult.details) return 0;
+  let score = 0;
+  eumResult.details.forEach(d => {
+    if (d.includes('상생')) score += 3;
+    else if (d.includes('동기')) score += 2;
+    else if (d.includes('조화')) score += 1;
+    else if (d.includes('상극') || d.includes('역극')) score -= 3;
+  });
+  return score;
+}
+
+// ============================================================
+// 용신 기반 작명 추천 및 통합 파이프라인 (v2 — 점수 강화)
 // ============================================================
 function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = [], heesinList = [], gisinList = []) {
-  const recommendations = [];
 
-  // 안전가드: 후보 풀 데이터가 없거나 글자가 너무 적으면 작동 중지
+  // 안전가드
   if (!poolOfNameChars || poolOfNameChars.length < 2) return [];
 
-  // 희신·기신 오행 집합 (한자 오행 기준)
   const heesinSet = new Set(heesinList.map(h => typeof h === 'string' ? h : h.oh).map(normalizeElement));
   const gisinSet  = new Set(gisinList.map(g => typeof g === 'string' ? g : g.oh).map(normalizeElement));
 
-  // 한자 char 기준 중복 방지
   const seenPairs = new Set();
 
-  // 1단계: 전체 한자 풀에서 두 글자씩 조합을 생성하며 전수조사
+  // ── 단일 조합을 평가하는 내부 함수 ──
+  // strictMode=true → 4격 전부 길 이상 + 음령 상생만 허용
+  // strictMode=false → 4격 대흉(terrible)만 제외, 음령 상극 1개까지 허용 (결과 부족 시 완화)
+  function evalPair(char1, char2, strictMode) {
+    if (char1.hanja === char2.hanja) return null;
+
+    const hasYongsin = (char1.element === yongsin) || (char2.element === yongsin);
+    if (!hasYongsin) return null;
+
+    if (gisinSet.size > 0) {
+      if (gisinSet.has(char1.element) || gisinSet.has(char2.element)) return null;
+    }
+
+    const hasHeesin = heesinSet.size > 0 && (heesinSet.has(char1.element) || heesinSet.has(char2.element));
+    const bothYongsin = (char1.element === yongsin) && (char2.element === yongsin);
+
+    const fullNameKor = `${sung}${char1.korean}${char2.korean}`;
+    const eumResult   = checkEumOhaengFlow(fullNameKor);
+
+    if (strictMode && !eumResult.isGood) return null;
+    if (!strictMode) {
+      // 완화 모드: 상극이 2개 이상이면 탈락
+      const badCount = (eumResult.details || []).filter(d => d.includes('상극') || d.includes('역극')).length;
+      if (badCount >= 2) return null;
+    }
+
+    const suriGeok = calcSuriGeok(sungStrokes, char1.strokes, char2.strokes);
+    const wonLuck    = SURI_DB[suriGeok.wonGeok]?.luck;
+    const hyeongLuck = SURI_DB[suriGeok.hyeongGeok]?.luck;
+    const iLuck      = SURI_DB[suriGeok.iGeok]?.luck;
+    const jeongLuck  = SURI_DB[suriGeok.jeongGeok]?.luck;
+
+    if (strictMode) {
+      // 엄격 모드: bad/terrible 하나라도 있으면 탈락
+      const hasBad = [wonLuck, hyeongLuck, iLuck, jeongLuck].some(l => l === 'bad' || l === 'terrible');
+      if (hasBad) return null;
+    } else {
+      // 완화 모드: terrible만 탈락, bad는 1개까지 허용
+      const hasTerrible = [wonLuck, hyeongLuck, iLuck, jeongLuck].some(l => l === 'terrible');
+      if (hasTerrible) return null;
+      const badCnt = [wonLuck, hyeongLuck, iLuck, jeongLuck].filter(l => l === 'bad').length;
+      if (badCnt >= 2) return null;
+    }
+
+    // ── 종합 점수 계산 ──
+    const suriScore = calcSuriScore(suriGeok);
+    const eumScore  = calcEumScore(eumResult);
+    // 두 글자 모두 용신이면 보너스
+    const yongsinBonus  = bothYongsin ? 3 : 0;
+    // 희신 보너스
+    const heesinBonus   = hasHeesin ? 2 : 0;
+    // 완화 모드 패널티 (정렬 시 엄격 모드 결과 뒤로)
+    const modePenalty   = strictMode ? 0 : -5;
+    const totalScore    = suriScore + eumScore + yongsinBonus + heesinBonus + modePenalty;
+
+    let matchLabel = '';
+    if (bothYongsin)      matchLabel = `용신(${yongsin}) 양글자`;
+    else if (hasHeesin)   matchLabel = `용신(${yongsin}) + 희신 보완`;
+    else                  matchLabel = `용신(${yongsin}) 보완`;
+    if (!strictMode)      matchLabel += ' ★완화';
+
+    return {
+      name: `${sung}${char1.char}${char2.char}`,
+      hanjaName: `${char1.hanja}${char2.hanja}`,
+      resourceOhaeng: `${char1.element}·${char2.element}`,
+      yongsinMatch: matchLabel,
+      eumOhaeng: {
+        flow:    eumResult.flow,
+        details: eumResult.details,
+        comment: eumResult.comment,
+        score:   eumScore
+      },
+      suriGeok: {
+        won:   { value: suriGeok.wonGeok,    luck: wonLuck,    meaning: SURI_DB[suriGeok.wonGeok]?.meaning },
+        hyeong:{ value: suriGeok.hyeongGeok, luck: hyeongLuck, meaning: SURI_DB[suriGeok.hyeongGeok]?.meaning },
+        i:     { value: suriGeok.iGeok,      luck: iLuck,      meaning: SURI_DB[suriGeok.iGeok]?.meaning },
+        jeong: { value: suriGeok.jeongGeok,  luck: jeongLuck,  meaning: SURI_DB[suriGeok.jeongGeok]?.meaning }
+      },
+      totalScore,
+      strictMode
+    };
+  }
+
+  // ── 1차 엄격 모드 탐색 ──
+  const strictResults = [];
+  const seenStrict = new Set();
+
   for (let i = 0; i < poolOfNameChars.length; i++) {
     for (let j = 0; j < poolOfNameChars.length; j++) {
-      const char1 = poolOfNameChars[i];
-      const char2 = poolOfNameChars[j];
-
-      // 같은 한자 중복 제외 (인덱스가 아닌 한자 문자 기준)
-      if (char1.hanja === char2.hanja) continue;
-
-      // 한자 쌍 중복 제외 (순서 포함)
-      const pairKey = char1.hanja + char2.hanja;
-      if (seenPairs.has(pairKey)) continue;
-      seenPairs.add(pairKey);
-
-      // [핵심 보정 ①]: 두 글자 중 최소 한 글자 이상이 용신 오행(자원오행)을 만족하는지 검사
-      const hasYongsin = (char1.element === yongsin) || (char2.element === yongsin);
-      if (!hasYongsin) continue; // 용신 보완이 안 되는 조합은 즉시 탈락
-
-      // [핵심 보정 ②]: 기신 오행 한자가 포함된 조합 제외
-      if (gisinSet.size > 0) {
-        if (gisinSet.has(char1.element) || gisinSet.has(char2.element)) continue;
-      }
-
-      // [가산점]: 희신 오행 한자 포함 여부 (필터 아닌 점수 가산)
-      const hasHeesin = heesinSet.size > 0 && (heesinSet.has(char1.element) || heesinSet.has(char2.element));
-
-      const fullName    = `${sung}${char1.char}${char2.char}`;     // 한자 조합 (수리오행용)
-      const fullNameKor = `${sung}${char1.korean}${char2.korean}`; // 한글 조합 (음령오행용)
-
-      // [파이프라인 ①]: 음령오행 흐름 체크 — 반드시 한글 이름으로 계산해야 초성 추출 가능
-      const eumOhaengResult = checkEumOhaengFlow(fullNameKor);
-      if (!eumOhaengResult.isGood) continue; // 발음이 막히면 다음 조합으로 패스
-
-      // [파이프라인 ②]: 성씨와 이름 한자 획수를 결합하여 수리오행 4격 계산
-      const suriGeok = calcSuriGeok(sungStrokes, char1.strokes, char2.strokes);
-
-      // [파이프라인 ③]: 4격(원/형/이/정격)의 길흉(luck) 필터링
-      const wonLuck = SURI_DB[suriGeok.wonGeok]?.luck;
-      const hyeongLuck = SURI_DB[suriGeok.hyeongGeok]?.luck;
-      const iLuck = SURI_DB[suriGeok.iGeok]?.luck;
-      const jeongLuck = SURI_DB[suriGeok.jeongGeok]?.luck;
-
-      // 四격 중 단 하나라도 '흉(bad)'이나 '대흉(terrible)'이 섞여 있으면 작명 리스트에서 영구 제외
-      const isBadSuri = [wonLuck, hyeongLuck, iLuck, jeongLuck].some(
-        luck => luck === "bad" || luck === "terrible"
-      );
-      if (isBadSuri) continue;
-
-      // [통합 완료]: 모든 기준(사주 용신보완 + 발음상생 + 4격 대길)을 패스한 마스터피스 이름 저장
-      recommendations.push({
-        name: fullName,
-        hanjaName: `${char1.hanja}${char2.hanja}`,
-        resourceOhaeng: `${char1.element}·${char2.element}`,
-        yongsinMatch: hasHeesin ? `용신(${yongsin}) + 희신 보완` : `용신(${yongsin}) 보완`,
-        eumOhaeng: {
-          flow:    eumOhaengResult.flow,
-          details: eumOhaengResult.details,   // 상생/상극 상세 설명 (누락 버그 수정)
-          comment: eumOhaengResult.comment
-        },
-        suriGeok: {
-          won: { value: suriGeok.wonGeok, luck: wonLuck, meaning: SURI_DB[suriGeok.wonGeok]?.meaning },
-          hyeong: { value: suriGeok.hyeongGeok, luck: hyeongLuck, meaning: SURI_DB[suriGeok.hyeongGeok]?.meaning },
-          i: { value: suriGeok.iGeok, luck: iLuck, meaning: SURI_DB[suriGeok.iGeok]?.meaning },
-          jeong: { value: suriGeok.jeongGeok, luck: jeongLuck, meaning: SURI_DB[suriGeok.jeongGeok]?.meaning }
-        }
-      });
+      const key = poolOfNameChars[i].hanja + poolOfNameChars[j].hanja;
+      if (seenStrict.has(key)) continue;
+      seenStrict.add(key);
+      const r = evalPair(poolOfNameChars[i], poolOfNameChars[j], true);
+      if (r) strictResults.push(r);
     }
   }
 
-  // 최종 조율된 최적의 작명 목록 반환
-  return recommendations;
+  // ── 2차 완화 모드 탐색 (엄격 결과가 12개 미만일 때만) ──
+  let fallbackResults = [];
+  if (strictResults.length < 12) {
+    const seenFallback = new Set(seenStrict); // 엄격 모드에서 통과한 쌍 제외
+    // 엄격 통과 쌍을 seenFallback에서 제거 → 완화에서 중복 안 나도록
+    strictResults.forEach(r => seenFallback.delete(r.hanjaName));
+
+    for (let i = 0; i < poolOfNameChars.length; i++) {
+      for (let j = 0; j < poolOfNameChars.length; j++) {
+        const key = poolOfNameChars[i].hanja + poolOfNameChars[j].hanja;
+        // 엄격 모드 통과 쌍은 건너뜀
+        if (strictResults.find(r => r.hanjaName === key)) continue;
+        if (seenPairs.has(key)) continue;
+        seenPairs.add(key);
+        const r = evalPair(poolOfNameChars[i], poolOfNameChars[j], false);
+        if (r) fallbackResults.push(r);
+      }
+    }
+  }
+
+  // ── 통합 정렬: totalScore 내림차순 ──
+  const all = [...strictResults, ...fallbackResults];
+  all.sort((a, b) => b.totalScore - a.totalScore);
+
+  return all;
 }
 // ── 브라우저 전역 노출 ──
 if (typeof window !== 'undefined') {
   window.SURI_DB            = SURI_DB;
+  window.SURI_LUCK_SCORE    = SURI_LUCK_SCORE;
   window.EUM_OHAENG         = EUM_OHAENG;
   window.OHAENG_RELATION    = OHAENG_RELATION;
   window.OHAENG_COLOR       = OHAENG_COLOR;
@@ -470,6 +550,8 @@ if (typeof window !== 'undefined') {
   window.normalizeElement   = normalizeElement;
   window.normalizeStrokes   = normalizeStrokes;
   window.calcSuriGeok       = calcSuriGeok;
+  window.calcSuriScore      = calcSuriScore;
+  window.calcEumScore       = calcEumScore;
   window.checkEumOhaengFlow = checkEumOhaengFlow;
   window.getYongsin         = getYongsin;
   window.countElements      = countElements;
