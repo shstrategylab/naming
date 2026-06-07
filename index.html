@@ -1139,55 +1139,173 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
         // 일간이 생하는 오행 (식상)
         const ilGeneratesOh = GENERATE[ilganOh];
 
-        let summary = '';
+        // ── 기둥별 십성 분류 ──
+        // 각 기둥의 천간·지지 십성을 수집해서 "어떤 기둥에 무슨 십성이 있는지" 파악
+        const pillarList = [
+          { name:'연주', p: ana.yeonju },
+          { name:'월주', p: ana.wolju  },
+          { name:'시주', p: ana.siju   },
+        ].filter(x => !!x.p);
 
-        if (isStrong) {
-          // 신강 — 기운을 빼거나 제어해야 함
-          const shielOh = ilGeneratesOh; // 식상: 일간이 생하는 오행 → 기운을 빼줌
-          const shielJW = OHJ[shielOh] || '';
-          const controlJW = OHJ[controlsIlOh] || '';
+        // 십성 → 카테고리 매핑
+        const SS_CAT = {
+          비견:'비겁', 겁재:'비겁',
+          식신:'식상', 상관:'식상',
+          편재:'재성', 정재:'재성',
+          편관:'관성', 정관:'관성',
+          편인:'인성', 정인:'인성',
+        };
+        // 카테고리 → 오행 (일간 기준)
+        const CAT_OH = {
+          비겁: ilganOh,
+          식상: ilGeneratesOh,
+          재성: ilControlsOh,
+          관성: controlsIlOh,
+          인성: generatesIlOh,
+        };
 
-          if (dominantOh && (d[dominantOh]||0) >= 2) {
-            // 특정 오행이 두드러지게 많은 경우
-            const domJW = OHJ[dominantOh];
-            if (CONTROL[dominantOh] === ilganOh) {
-              // 타 오행이 일간을 극하는 구조 → 일간 압박
-              summary = `이 사주는 일간 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>이 ${domJW}의 극(剋)을 받아 실제로 압박을 받는 구조입니다. `
-                + `식상인 <strong style="color:${OHC[shielOh]}">${shielJW}(${shielOh})</strong>으로 일간의 기운을 설기(洩氣)하거나, `
-                + `인성인 <strong style="color:${OHC[generatesIlOh]||'var(--mut)'}">토(토)</strong> 계열로 일간을 보강하는 방향이 합리적입니다. `
-                + `이름 한자에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 담아 균형을 맞춥니다.`;
-            } else if (CONTROL[ilganOh] === dominantOh) {
-              // 일간이 많은 오행을 극하지 못하는 구조
-              summary = `이 사주는 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong> 일간이 <strong style="color:${OHC[dominantOh]}">${domJW}(${dominantOh})</strong>을 극해야 하나, ${domJW}의 수가 많아 오히려 일간이 힘을 쏟는 구조입니다. `
-                + `식상인 <strong style="color:${OHC[shielOh]}">${shielJW}(${shielOh})</strong>으로 일간의 기운을 빼거나, `
-                + `인성으로 일간을 보강하는 방향이 더 효과적입니다. `
-                + `이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충합니다.`;
-            } else {
-              summary = `이 사주는 ${shingStr}으로 일간 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>의 기운이 강합니다. `
-                + `강한 기운을 설기(洩氣)할 식상 <strong style="color:${OHC[shielOh]}">${shielJW}(${shielOh})</strong>, 또는 극제(剋制)할 `
-                + `<strong style="color:${OHC[controlsIlOh]}">${controlJW}(${controlsIlOh})</strong> 오행이 균형을 잡아줍니다. `
-                + `이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 담습니다.`;
-            }
-          } else {
-            summary = `이 사주는 ${shingStr}으로 일간 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>의 기운이 강합니다. `
-              + `식상 <strong style="color:${OHC[shielOh]}">${shielJW}(${shielOh})</strong>으로 기운을 설기하거나, `
-              + `<strong style="color:${OHC[controlsIlOh]}">${controlJW}(${controlsIlOh})</strong>으로 극제하는 방향이 필요합니다. `
-              + `이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충합니다.`;
-          }
-        } else if (isWeak) {
-          // 신약 — 일간을 생하거나 비겁으로 도와야 함
-          const supportJW = OHJ[generatesIlOh] || '';
-          summary = `이 사주는 ${shingStr}으로 일간 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>의 기운이 약합니다. `
-            + `일간을 생(生)하는 인성 <strong style="color:${OHC[generatesIlOh]}">${supportJW}(${generatesIlOh})</strong>, 또는 같은 오행의 비겁으로 힘을 더해주어야 합니다. `
-            + `이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 담아 일간을 보강합니다.`;
-        } else {
-          // 중화
-          summary = `이 사주는 일간 <strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>의 기운이 비교적 균형을 이루고 있습니다. `
-            + `전체 오행의 조화를 유지하는 방향으로 이름을 짓되, 부족한 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 이름 한자에 담아 보완합니다.`;
+        // 기둥별 십성 목록 (천간+지지)
+        function getPillarSS(pillar) {
+          const ganSS  = SajuEngine.getStemSipseong(ilIdx, pillar.stemIdx);
+          const jiSS   = SajuEngine.getBranchSipseong(ilIdx, pillar.branchIdx);
+          return [ganSS, jiSS].filter(Boolean);
         }
 
+        // 전체 사주에 등장하는 십성 목록 (일주 제외)
+        const allSS = pillarList.flatMap(pl => getPillarSS(pl.p));
+        const ssSummary = {}; // { 식상: ['시주'], 관성: ['월주','연주'], ... }
+        pillarList.forEach(pl => {
+          getPillarSS(pl.p).forEach(ss => {
+            const cat = SS_CAT[ss];
+            if (!cat) return;
+            if (!ssSummary[cat]) ssSummary[cat] = [];
+            if (!ssSummary[cat].includes(pl.name)) ssSummary[cat].push(pl.name);
+          });
+        });
+
+        // 헬퍼: 카테고리가 사주에 있는지 + 어느 기둥인지 설명
+        function catDesc(cat) {
+          const positions = ssSummary[cat];
+          if (!positions || positions.length === 0) return null;
+          const oh  = CAT_OH[cat];
+          const jw  = OHJ[oh] || '';
+          const col = OHC[oh] || 'var(--mut)';
+          return { positions, oh, jw, col, label: `<strong style="color:${col}">${jw}(${oh})</strong>` };
+        }
+
+        // ── 4단계 서사 조립 ──
+        let summary = '';
+        const ilLabel = `<strong style="color:${OHC[ilganOh]}">${ilganJW}(${ilganOh})</strong>`;
+        const ysLabel = `<strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong>`;
+
+        if (isStrong) {
+          // ① 현재 상황: 일간이 강한 이유
+          const bigeop = catDesc('비겁');
+          const inseong = catDesc('인성');
+          const supportPos = [...(bigeop?.positions||[]), ...(inseong?.positions||[])];
+
+          summary = `이 사주는 ${ilLabel} 일간이 `;
+          if (supportPos.length > 0) {
+            summary += `${supportPos.join('·')}에 비겁·인성이 뒷받침되어 기운이 강한 ${shingStr} 구조입니다. `;
+          } else {
+            summary += `전체 오행 분포상 기운이 두드러지게 강한 ${shingStr} 구조입니다. `;
+          }
+
+          // ② 그러나: 다른 기둥들의 구체적 작용
+          const siksang = catDesc('식상');
+          const gwanseong = catDesc('관성');
+          const jaeseong = catDesc('재성');
+
+          // 지배적 타 오행이 일간을 극하는지 확인
+          const pressingOh = dominantOh && CONTROL[dominantOh] === ilganOh ? dominantOh : null;
+          const pressingJW = pressingOh ? OHJ[pressingOh] : null;
+          const pressingCnt = pressingOh ? (d[pressingOh]||0) : 0;
+
+          if (pressingOh && pressingCnt >= 2) {
+            summary += `그러나 ${pressingJW}(${pressingOh})이 ${pressingCnt}개로 일간을 극(剋)하여 실질적으로 압박을 주고 있습니다. `;
+            if (siksang) {
+              summary += `${siksang.positions.join('·')}의 식상(${siksang.jw})이 일간의 기운을 설기(洩氣)해 ${pressingJW}을 생(生)하는 흐름으로 이어지므로, `;
+              summary += `표면적 극이 순환 구조로 전환되는 면이 있습니다. `;
+            } else if (gwanseong) {
+              summary += `${gwanseong.positions.join('·')}의 관성이 일간을 제어하는 구조이기도 합니다. `;
+            }
+          } else if (siksang) {
+            summary += `그러나 ${siksang.positions.join('·')}에 식상(${siksang.label})이 자리하여 일간의 강한 기운을 자연스럽게 설기(洩氣)하는 순환 구조가 형성되어 있습니다. `;
+            if (jaeseong) {
+              summary += `${jaeseong.positions.join('·')}의 재성이 이를 받아 흐름을 이어갑니다. `;
+            }
+          } else if (gwanseong) {
+            summary += `그러나 ${gwanseong.positions.join('·')}에 관성이 위치하여 일간을 극제(剋制)하는 역할을 하고 있습니다. `;
+          } else {
+            summary += `그러나 강한 기운을 자연스럽게 빼줄 식상·관성이 부족하여 오행의 흐름이 정체되는 구조입니다. `;
+          }
+
+          // ③ 따라서: 용신 도출 근거
+          summary += `따라서 이 사주에서는 `;
+          if (siksang && siksang.oh === yongsinOh) {
+            summary += `일간의 과한 기운을 빼고 순환을 돕는 식상 ${ysLabel}이 용신이 됩니다. `;
+          } else if (gwanseong && gwanseong.oh === yongsinOh) {
+            summary += `일간을 제어하여 균형을 잡아줄 관성 ${ysLabel}이 용신이 됩니다. `;
+          } else if (jaeseong && jaeseong.oh === yongsinOh) {
+            summary += `식상에서 이어지는 재성 ${ysLabel}으로 흐름을 마무리하는 것이 가장 합리적입니다. `;
+          } else {
+            summary += `부족하거나 보충이 필요한 ${ysLabel} 오행이 용신으로 도출됩니다. `;
+          }
+
+        } else if (isWeak) {
+          // ① 현재 상황
+          const gwanseong = catDesc('관성');
+          const jaeseong  = catDesc('재성');
+          const siksang   = catDesc('식상');
+          const pressingOh2 = dominantOh && (CONTROL[dominantOh]===ilganOh || GENERATE[ilganOh]===dominantOh) ? dominantOh : null;
+
+          summary = `이 사주는 ${ilLabel} 일간의 기운이 약한 ${shingStr} 구조입니다. `;
+
+          // ② 그러나
+          if (gwanseong && (d[gwanseong.oh]||0) >= 2) {
+            summary += `${gwanseong.positions.join('·')}에 관성(${gwanseong.label})이 ${d[gwanseong.oh]}개 자리하여 일간을 강하게 극(剋)하고 있습니다. `;
+          } else if (siksang && (d[siksang.oh]||0) >= 2) {
+            summary += `${siksang.positions.join('·')}에 식상(${siksang.label})이 ${d[siksang.oh]}개로 일간의 기운을 지나치게 소모시키고 있습니다. `;
+          } else if (jaeseong) {
+            summary += `${jaeseong.positions.join('·')}의 재성이 일간을 소모시키는 구조로, 일간을 보강하는 기운이 부족합니다. `;
+          } else {
+            summary += `전반적으로 일간을 도와줄 비겁·인성이 부족하여 일간의 힘이 부치는 구조입니다. `;
+          }
+
+          // 다른 기둥의 보완 요소가 있는지
+          const inseong = catDesc('인성');
+          const bigeop  = catDesc('비겁');
+          if (inseong) {
+            summary += `다만 ${inseong.positions.join('·')}의 인성(${inseong.label})이 일간을 생(生)해주어 완전한 고립은 아닙니다. `;
+          } else if (bigeop) {
+            summary += `다만 ${bigeop.positions.join('·')}의 비겁이 일간 옆에서 힘을 보태고 있습니다. `;
+          }
+
+          // ③ 따라서
+          const inseongJW = OHJ[generatesIlOh] || '';
+          summary += `따라서 이 사주에서는 일간을 직접 생(生)해주는 인성 `;
+          if (inseong && inseong.oh === yongsinOh) {
+            summary += `${ysLabel}이 용신으로, 이미 사주에 존재하는 인성의 흐름을 이름으로 더욱 강화합니다. `;
+          } else if (bigeop && bigeop.oh === yongsinOh) {
+            summary += `또는 같은 오행의 비겁 ${ysLabel}이 용신이 되어 일간을 직접 보강합니다. `;
+          } else {
+            summary += `<strong style="color:${OHC[generatesIlOh]}">${inseongJW}(${generatesIlOh})</strong> 또는 비겁 ${ysLabel}이 용신으로 도출됩니다. `;
+          }
+
+        } else {
+          // 중화
+          const minOh = ['목','화','토','금','수'].reduce((a,b) => (d[a]||0) <= (d[b]||0) ? a : b);
+          const minJW = OHJ[minOh] || '';
+          summary = `이 사주는 ${ilLabel} 일간의 기운이 비교적 고른 ${shingStr} 구조입니다. `
+            + `전체 오행 분포를 보면 <strong style="color:${OHC[minOh]}">${minJW}(${minOh})</strong>이 가장 부족합니다. `
+            + `특정 오행이 압도적으로 강하거나 약하지 않으므로, 가장 부족한 오행을 보충하는 방향으로 용신을 정합니다. `
+            + `따라서 ${ysLabel} 오행이 용신이 됩니다. `;
+        }
+
+        // ④ 결론: 이름 방향
+        summary += `이름 한자에 ${ysLabel} 오행을 담아 사주의 균형점을 맞춥니다.`;
         if (heesinInfo) {
-          summary += ` 희신(${heesinInfo})을 함께 활용하면 더욱 좋은 이름이 됩니다.`;
+          summary += ` 또한 희신 <strong>${heesinInfo}</strong>을 함께 활용하면 더욱 좋은 이름이 됩니다.`;
         }
 
         return summary;
