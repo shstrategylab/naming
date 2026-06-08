@@ -1558,18 +1558,23 @@ function renderNames(list, page = 1) {
   const strictCount   = list.filter(r => r.strictMode !== false).length;
   const fallbackCount = list.length - strictCount;
 
-  // 필터 버튼: 각 오행별 이름 수 집계 + 의미 레이블
+  // 필터 버튼: 카운트는 항상 G.results 전체 기준, 활성 상태는 G.filterEl 기준
   const elLabel = {'木':'木(나무)','火':'火(불)','土':'土(흙)','金':'金(쇠)','水':'水(물)'};
-  let fr = `<button class="fb on" onclick="filterE(null,this)">전체 (${list.length}개)</button>`;
+  const isAllActive = !G.filterEl;
+  let fr = `<button class="fb${isAllActive?' on':''}" onclick="filterE(null,this)">전체 (${G.results.length}개)</button>`;
   allEl.forEach(el => {
-    const cnt = list.filter(r => matchesFilter(r, el)).length;
+    const cnt = G.results.filter(r => matchesFilter(r, el)).length;
+    const isActive = G.filterEl === el;
     if (cnt > 0)
-      fr += `<button class="fb" onclick="filterE('${el}',this)" title="${el} 오행 한자가 포함된 이름">${elLabel[el]} ${cnt}개</button>`;
+      fr += `<button class="fb${isActive?' on':''}" onclick="filterE('${el}',this)" title="${el} 오행 한자가 포함된 이름">${elLabel[el]} ${cnt}개</button>`;
   });
   document.getElementById('fr').innerHTML = fr;
 
+  const totalCount = G.results.length;
   let siText = list.length
-    ? `총 ${list.length}개 · 종합점수순 — ★많을수록 좋은 이름`
+    ? (G.filterEl
+        ? `${G.filterEl} 오행 ${list.length}개 (전체 ${totalCount}개) · 종합점수순`
+        : `총 ${list.length}개 · 종합점수순 — ★많을수록 좋은 이름`)
     : '';
   if (fallbackCount > 0 && strictCount > 0)
     siText += ` &nbsp;·&nbsp; <span style="color:var(--mut);font-size:9px">[완화] ${fallbackCount}개 포함</span>`;
@@ -1684,8 +1689,6 @@ function changePage(p) {
 
 function filterE(el, btn) {
   G.filterEl = el;
-  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
   const filtered = el ? G.results.filter(r => matchesFilter(r, el)) : G.results;
   renderNames(filtered, 1);
 }
