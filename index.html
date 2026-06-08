@@ -1750,8 +1750,9 @@ function showDet(idx, e) {
             wonGeok: sg.won.value, hyeongGeok: sg.hyeong.value,
             iGeok: sg.i.value, jeongGeok: sg.jeong.value
           }) : '—';
-          const eumScore  = r.eumOhaeng?.score ?? '—';
-          const total     = r.totalScore ?? '—';
+          const eumScore     = r.eumOhaeng?.score ?? 0;
+          const eumYangScore = r.eumYang?.score ?? 0;
+          const total        = r.totalScore ?? '—';
           const isFallback = r.strictMode === false;
           const yongsinCols = r.yongsinMatch || '';
           const bothYongsin = yongsinCols.includes('양글자');
