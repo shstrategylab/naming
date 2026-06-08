@@ -403,7 +403,54 @@ function calcEumScore(eumResult) {
 }
 
 // ============================================================
-// 용신 기반 작명 추천 및 통합 파이프라인 (v2 — 점수 강화)
+// ② 음양 배합(陰陽配合) 점수
+// 이름 두 글자의 획수 홀짝(음양)과 성씨 획수를 포함한
+// 3자 전체의 음양 흐름을 평가한다.
+//
+// 원칙:
+//  - 성(性)·이름1·이름2 세 글자가 모두 같은 음양이면 치우침(흉)
+//  - 성과 이름1, 이름1과 이름2가 서로 음양이 교차하면 최길
+//  - 두 글자 중 하나만 교차해도 길
+//  - 세 글자 모두 양(홀) 또는 모두 음(짝)이면 흉
+//
+// 획수 기준: 홀수=양(陽), 짝수=음(陰)
+// ============================================================
+function calcEumYang(sungStrokes, name1Strokes, name2Strokes) {
+  const yang = (n) => n % 2 !== 0; // 홀수=양
+  const sY  = yang(sungStrokes);
+  const n1Y = yang(name1Strokes);
+  const n2Y = yang(name2Strokes);
+
+  // 음양 레이블
+  const label = (b) => b ? '양(陽)' : '음(陰)';
+  const flow  = `${label(sY)}·${label(n1Y)}·${label(n2Y)}`;
+
+  // 교차 횟수 계산 (성→이름1, 이름1→이름2)
+  const cross1 = sY  !== n1Y; // 성-이름1 교차
+  const cross2 = n1Y !== n2Y; // 이름1-이름2 교차
+  const allSame = sY === n1Y && n1Y === n2Y; // 모두 같은 음양
+
+  let score, grade, comment;
+
+  if (cross1 && cross2) {
+    // 양→음→양 또는 음→양→음: 완전 교차 = 최길
+    score = 6; grade = '◎';
+    comment = `${flow} — 음양 완전 교차, 균형 최우수`;
+  } else if (cross1 || cross2) {
+    // 하나만 교차
+    score = 3; grade = '○';
+    comment = `${flow} — 음양 부분 교차, 양호`;
+  } else if (allSame) {
+    // 모두 동일 음양: 치우침
+    score = -3; grade = '✕';
+    comment = `${flow} — 음양 편중(모두 ${label(sY)}), 주의`;
+  } else {
+    score = 0; grade = '△';
+    comment = `${flow} — 음양 보통`;
+  }
+
+  return { score, grade, flow, comment, detail: { sY, n1Y, n2Y, cross1, cross2, allSame } };
+}
 // ============================================================
 function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = [], heesinList = [], gisinList = []) {
 
@@ -460,15 +507,17 @@ function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = [], heesin
     }
 
     // ── 종합 점수 계산 ──
-    const suriScore = calcSuriScore(suriGeok);
-    const eumScore  = calcEumScore(eumResult);
+    const suriScore   = calcSuriScore(suriGeok);
+    const eumScore    = calcEumScore(eumResult);
+    const eumYang     = calcEumYang(sungStrokes, char1.strokes, char2.strokes);
+    const eumYangScore = eumYang.score;
     // 두 글자 모두 용신이면 보너스
     const yongsinBonus  = bothYongsin ? 3 : 0;
     // 희신 보너스
     const heesinBonus   = hasHeesin ? 2 : 0;
     // 완화 모드 패널티 (정렬 시 엄격 모드 결과 뒤로)
     const modePenalty   = strictMode ? 0 : -5;
-    const totalScore    = suriScore + eumScore + yongsinBonus + heesinBonus + modePenalty;
+    const totalScore    = suriScore + eumScore + eumYangScore + yongsinBonus + heesinBonus + modePenalty;
 
     let matchLabel = '';
     if (bothYongsin)      matchLabel = `용신(${yongsin}) 양글자`;
@@ -487,6 +536,7 @@ function recommendNames(sung, sungStrokes, yongsin, poolOfNameChars = [], heesin
         comment: eumResult.comment,
         score:   eumScore
       },
+      eumYang,   // ② 음양 배합 결과
       suriGeok: {
         won:   { value: suriGeok.wonGeok,    luck: wonLuck,    meaning: SURI_DB[suriGeok.wonGeok]?.meaning },
         hyeong:{ value: suriGeok.hyeongGeok, luck: hyeongLuck, meaning: SURI_DB[suriGeok.hyeongGeok]?.meaning },
@@ -552,6 +602,7 @@ if (typeof window !== 'undefined') {
   window.calcSuriGeok       = calcSuriGeok;
   window.calcSuriScore      = calcSuriScore;
   window.calcEumScore       = calcEumScore;
+  window.calcEumYang        = calcEumYang;
   window.checkEumOhaengFlow = checkEumOhaengFlow;
   window.getYongsin         = getYongsin;
   window.countElements      = countElements;
