@@ -122,6 +122,9 @@ select option{background:var(--sur2)}
 .ysn{font-size:15px;font-family:'Noto Serif KR',serif;margin-bottom:4px}
 .ysd{font-size:11px;color:var(--mut);line-height:1.6}
 .ys-reason{margin-top:6px;padding:5px 8px;background:rgba(255,180,0,.10);border-left:3px solid #f0a500;border-radius:3px;color:#b07800;font-size:10.5px;line-height:1.5}
+.ys-johu{font-size:10px;color:var(--goldl);margin-top:5px;padding:3px 6px;background:rgba(226,196,122,.07);border-left:2px solid var(--goldd)}
+.ys-jeonwang{font-size:10px;color:#e07b39;margin-top:5px;padding:3px 6px;background:rgba(224,123,57,.07);border-left:2px solid #e07b39}
+.ys-logic{font-size:9px;color:var(--dim);margin-top:6px;padding:4px 6px;background:var(--sur2);line-height:1.7;border:1px solid var(--bdr)}
 .lunar-w{margin-top:9px;padding:8px 12px;background:rgba(201,168,76,.06);border:1px solid var(--goldd);font-size:10px;color:var(--goldd);line-height:1.6}
 
 /* 용신 풀이 */
@@ -901,6 +904,22 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
     ? `<div class="ys-reason">⚠️ ${ana.yongsin.reason}</div>`
     : '';
 
+  // 조후용신 표시
+  const johuHtml = ana.yongsin.johu
+    ? `<div class="ys-johu">🌡️ 조후용신: <strong>${ana.yongsin.johu.primary}</strong>${ana.yongsin.johu.secondary?` (보조: ${ana.yongsin.johu.secondary})`:''} — ${ana.yongsin.johu.note}</div>`
+    : '';
+
+  // 전왕용신(종격) 표시
+  const jwInfo = ana.yongsin.jeonwang;
+  const jwHtml = jwInfo?.isJong
+    ? `<div class="ys-jeonwang">⚡ ${jwInfo.type}: ${jwInfo.reason}</div>`
+    : '';
+
+  // logic 요약 (판단 근거 전체)
+  const logicHtml = (ana.yongsin.logic && ana.yongsin.logic.length)
+    ? `<div class="ys-logic">${ana.yongsin.logic.map(l=>`<span>${l}</span>`).join('<br>')}</div>`
+    : '';
+
   d += `<div class="ysbox">
     <div class="ysc" style="color:${ysCol}">${yongsinJW}</div>
     <div style="flex:1">
@@ -912,7 +931,7 @@ function renderSaju(pillars, dist, yongsinOh, yongsinJW, ana, lunarMsg) {
         ${heesinInfo ? `희신: <span style="color:var(--mut)">${heesinInfo}</span> &nbsp;·&nbsp; ` : ''}
         ${gisinInfo  ? `기신: <span style="color:var(--bad)">${gisinInfo}</span><br>` : ''}
         이름에 <strong style="color:${ysCol}">${yongsinJW}(${yongsinOh})</strong> 오행을 보충하여 사주 균형을 맞춥니다.
-        ${reasonHtml}
+        ${johuHtml}${jwHtml}${reasonHtml}${logicHtml}
       </div>
     </div>
   </div>`;
@@ -1590,7 +1609,14 @@ function renderNames(list, page = 1) {
     const globalIdx = (curPage - 1) * PAGE_SIZE + idx;
     const [e1,e2]  = r.resourceOhaeng.split('·');
     const nameBody = r.name.slice(1);
-    const eumScore = r.eumOhaeng?.score ?? 0;
+    const eumYangScore = r.eumYang?.score ?? 0;
+    const eumYangBadge = eumYangScore >= 6
+      ? `<span class="eum-badge eum-great">음양◎</span>`
+      : eumYangScore >= 3
+      ? `<span class="eum-badge eum-good">음양○</span>`
+      : eumYangScore < 0
+      ? `<span class="eum-badge" style="color:var(--dim);border-color:var(--dim)">음양✕</span>`
+      : '';
     const eumBadge = eumScore >= 6
       ? `<span class="eum-badge eum-great">음령◎</span>`
       : eumScore >= 3
@@ -1614,7 +1640,7 @@ function renderNames(list, page = 1) {
       <div class="nbs">
         <span class="ob ob-${e1}">${e1}</span>
         <span class="ob ob-${e2}">${e2}</span>
-        ${eumBadge}${fallbackBadge}
+        ${eumBadge}${eumYangBadge}${fallbackBadge}
       </div>
       <div class="name-summary">${summary}</div>
       <div class="sr">
@@ -1736,7 +1762,10 @@ function showDet(idx, e) {
               <span class="scr-note">정격(★) 2배 가중</span>
             </div>
             <div class="scr-row">
-              <span class="scr-lbl">음령오행 흐름 점수</span>
+              <span class="scr-lbl">음양 배합 점수</span>
+              <span class="scr-val" style="color:${eumYangScore>=6?'var(--good)':eumYangScore>=3?'var(--goldl)':eumYangScore<0?'var(--dim)':'var(--mut)'}">${eumYangScore}점</span>
+              <span class="scr-note">${r.eumYang?.comment || '—'}</span>
+            </div>
               <span class="scr-val" style="color:${eumScore>=6?'var(--good)':eumScore>=3?'var(--goldl)':'var(--mut)'}">${eumScore}점</span>
               <span class="scr-note">상생+3 / 동기+2 / 상극-3</span>
             </div>
