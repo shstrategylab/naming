@@ -83,6 +83,261 @@ const SajuEngine = (() => {
     return { rooted: roots.length > 0, roots };
   }
 
+  // ─── ① 조후용신(調候用神) 기준표 ───────────────────────────────
+  // 10천간(일간) × 12월지(월지 지지 인덱스 0=자~11=해) → 조후용신 오행
+  // 출처: 적천수·자평진전·명리정종 종합 기준
+  // 형식: { primary: '오행', secondary: '오행'|null, note: '설명' }
+  // primary = 최우선 조후용신, secondary = 보조 조후용신
+  const JOHU_TABLE = {
+    // 갑목(甲木) — 큰 나무, 수·토 필요
+    갑: {
+       0: { primary:'병', secondary:'계', note:'자월 한랭, 병화 해동 우선, 계수 자윤' },    // 子
+       1: { primary:'병', secondary:'계', note:'축월 동한, 병화 최우선' },                  // 丑
+       2: { primary:'경', secondary:'병', note:'인월 갑목 왕, 경금 제목, 병화 보조' },      // 寅
+       3: { primary:'경', secondary:'병', note:'묘월 갑목 최강, 경금 용신' },               // 卯
+       4: { primary:'경', secondary:'병', note:'진월 경금 제목, 병화 보조' },               // 辰
+       5: { primary:'계', secondary:'병', note:'사월 염조, 계수 자윤 우선, 병화 보조' },    // 巳
+       6: { primary:'계', secondary:'병', note:'오월 극염, 계수 최우선' },                  // 午
+       7: { primary:'계', secondary:'병', note:'미월 조열, 계수 우선' },                    // 未
+       8: { primary:'경', secondary:'정', note:'신월 경금 제목, 정화 보조' },               // 申
+       9: { primary:'경', secondary:'정', note:'유월 금왕 제목, 정화 보조' },               // 酉
+      10: { primary:'경', secondary:'병', note:'술월 토조, 경금 제목, 병화 보조' },         // 戌
+      11: { primary:'경', secondary:'병', note:'해월 한냉, 경금 제목, 병화 해동' },         // 亥
+    },
+    // 을목(乙木) — 화초·덩굴, 수·화 필요
+    을: {
+       0: { primary:'병', secondary:null, note:'자월 한냉, 병화 해동' },
+       1: { primary:'병', secondary:'무', note:'축월 동한, 병화 우선, 무토 보조' },
+       2: { primary:'병', secondary:'계', note:'인월 병화 우선, 계수 보조' },
+       3: { primary:'병', secondary:'계', note:'묘월 병화 우선, 계수 보조' },
+       4: { primary:'계', secondary:'병', note:'진월 계수 자윤, 병화 보조' },
+       5: { primary:'계', secondary:'병', note:'사월 염조, 계수 최우선' },
+       6: { primary:'계', secondary:'병', note:'오월 극염, 계수 최우선' },
+       7: { primary:'계', secondary:'병', note:'미월 조열, 계수 우선' },
+       8: { primary:'계', secondary:'병', note:'신월 계수 자윤, 병화 보조' },
+       9: { primary:'계', secondary:'병', note:'유월 계수 우선, 병화 보조' },
+      10: { primary:'계', secondary:'병', note:'술월 조토, 계수 우선' },
+      11: { primary:'병', secondary:'무', note:'해월 한냉, 병화 우선, 무토 보조' },
+    },
+    // 병화(丙火) — 태양, 임수·경금 필요
+    병: {
+       0: { primary:'임', secondary:'무', note:'자월 수왕 염려, 임수 조절, 무토 제수' },
+       1: { primary:'임', secondary:'무', note:'축월 한냉, 임수+무토 균형' },
+       2: { primary:'임', secondary:'경', note:'인월 병화 성장, 임수 우선, 경금 보조' },
+       3: { primary:'임', secondary:'경', note:'묘월 임수 우선, 경금 보조' },
+       4: { primary:'임', secondary:'갑', note:'진월 임수 우선, 갑목 보조' },
+       5: { primary:'임', secondary:'경', note:'사월 염조 시작, 임수 최우선' },
+       6: { primary:'임', secondary:'경', note:'오월 극염, 임수 절대 용신' },
+       7: { primary:'임', secondary:'경', note:'미월 조열, 임수 최우선' },
+       8: { primary:'임', secondary:'무', note:'신월 경금 생수, 임수+무토' },
+       9: { primary:'임', secondary:'갑', note:'유월 임수 우선, 갑목 보조' },
+      10: { primary:'임', secondary:'갑', note:'술월 조토, 임수 우선' },
+      11: { primary:'무', secondary:'갑', note:'해월 수왕, 무토 제수, 갑목 보조' },
+    },
+    // 정화(丁火) — 촛불·화로, 갑목·경금 필요
+    정: {
+       0: { primary:'갑', secondary:'경', note:'자월 한냉, 갑목 생화 우선, 경금 보조' },
+       1: { primary:'갑', secondary:'경', note:'축월 동한, 갑목 최우선' },
+       2: { primary:'갑', secondary:'경', note:'인월 갑목 왕, 경금 제목 보조' },
+       3: { primary:'갑', secondary:'경', note:'묘월 갑목 생화, 경금 보조' },
+       4: { primary:'갑', secondary:'경', note:'진월 갑목 우선, 경금 보조' },
+       5: { primary:'갑', secondary:'경', note:'사월 갑목 우선, 경금 보조' },
+       6: { primary:'임', secondary:'경', note:'오월 극염, 임수 조절 최우선' },
+       7: { primary:'갑', secondary:'경', note:'미월 갑목 우선, 경금 보조' },
+       8: { primary:'갑', secondary:'경', note:'신월 갑목 우선, 경금 제목 보조' },
+       9: { primary:'갑', secondary:'경', note:'유월 갑목 우선, 경금 보조' },
+      10: { primary:'갑', secondary:'경', note:'술월 조토, 갑목 우선' },
+      11: { primary:'갑', secondary:'경', note:'해월 한냉, 갑목 생화 최우선' },
+    },
+    // 무토(戊土) — 큰 산, 병화·갑목 필요
+    무: {
+       0: { primary:'병', secondary:'갑', note:'자월 한냉, 병화 해동 최우선' },
+       1: { primary:'병', secondary:'갑', note:'축월 동한, 병화 최우선' },
+       2: { primary:'병', secondary:'갑', note:'인월 병화 우선, 갑목 보조' },
+       3: { primary:'병', secondary:'계', note:'묘월 병화 우선, 계수 보조' },
+       4: { primary:'병', secondary:'갑', note:'진월 병화 우선, 갑목 보조' },
+       5: { primary:'임', secondary:'병', note:'사월 임수 윤토, 병화 보조' },
+       6: { primary:'임', secondary:'병', note:'오월 극염, 임수 절대 필요' },
+       7: { primary:'임', secondary:'병', note:'미월 임수 우선, 병화 보조' },
+       8: { primary:'병', secondary:'계', note:'신월 병화 우선, 계수 보조' },
+       9: { primary:'병', secondary:'계', note:'유월 병화 우선, 계수 보조' },
+      10: { primary:'갑', secondary:'병', note:'술월 조토, 갑목 소토, 병화 보조' },
+      11: { primary:'병', secondary:'갑', note:'해월 한냉, 병화 최우선' },
+    },
+    // 기토(己土) — 밭·정원, 병화·계수 필요
+    기: {
+       0: { primary:'병', secondary:'무', note:'자월 한냉, 병화 해동 우선' },
+       1: { primary:'병', secondary:'무', note:'축월 동한, 병화 최우선' },
+       2: { primary:'병', secondary:'계', note:'인월 병화 우선, 계수 보조' },
+       3: { primary:'병', secondary:'계', note:'묘월 병화 우선, 계수 보조' },
+       4: { primary:'병', secondary:'계', note:'진월 병화 우선, 계수 보조' },
+       5: { primary:'계', secondary:'병', note:'사월 염조, 계수 최우선' },
+       6: { primary:'계', secondary:'병', note:'오월 극염, 계수 절대 필요' },
+       7: { primary:'계', secondary:'병', note:'미월 조열, 계수 우선' },
+       8: { primary:'병', secondary:'계', note:'신월 병화 우선, 계수 보조' },
+       9: { primary:'병', secondary:'계', note:'유월 병화 우선, 계수 보조' },
+      10: { primary:'병', secondary:'계', note:'술월 조토, 병화+계수' },
+      11: { primary:'병', secondary:'무', note:'해월 한냉, 병화 최우선' },
+    },
+    // 경금(庚金) — 원석·도끼, 병화·정화 필요
+    경: {
+       0: { primary:'정', secondary:'병', note:'자월 한냉, 정화 제련 우선' },
+       1: { primary:'병', secondary:'정', note:'축월 동한, 병화·정화' },
+       2: { primary:'무', secondary:'병', note:'인월 갑목 강, 무토 제목, 병화 보조' },
+       3: { primary:'정', secondary:'갑', note:'묘월 정화 제련, 갑목 보조' },
+       4: { primary:'갑', secondary:'정', note:'진월 갑목 소토, 정화 보조' },
+       5: { primary:'임', secondary:'무', note:'사월 염조, 임수 냉각 우선' },
+       6: { primary:'임', secondary:'무', note:'오월 극염, 임수 절대 용신' },
+       7: { primary:'임', secondary:'정', note:'미월 임수 우선, 정화 보조' },
+       8: { primary:'정', secondary:'갑', note:'신월 금왕, 정화 제련 최우선' },
+       9: { primary:'정', secondary:'갑', note:'유월 금왕, 정화 제련 최우선' },
+      10: { primary:'갑', secondary:'정', note:'술월 조토, 갑목 소토, 정화 보조' },
+      11: { primary:'정', secondary:'병', note:'해월 한냉, 정화·병화 해동' },
+    },
+    // 신금(辛金) — 보석·칼날, 병화·임수 필요
+    신: {
+       0: { primary:'병', secondary:'무', note:'자월 한냉, 병화 해동 최우선' },
+       1: { primary:'병', secondary:'무', note:'축월 동한, 병화 우선, 무토 보조' },
+       2: { primary:'임', secondary:'무', note:'인월 임수 세척, 무토 보조' },
+       3: { primary:'임', secondary:'갑', note:'묘월 임수 세척, 갑목 보조' },
+       4: { primary:'임', secondary:'갑', note:'진월 임수 우선, 갑목 보조' },
+       5: { primary:'임', secondary:'병', note:'사월 임수 세척·냉각, 병화 보조' },
+       6: { primary:'임', secondary:'병', note:'오월 극염, 임수 절대 우선' },  // ← 핵심: 이 사주의 경우
+       7: { primary:'임', secondary:'병', note:'미월 임수 우선, 병화 보조' },
+       8: { primary:'임', secondary:'무', note:'신월 임수 세척, 무토 보조' },
+       9: { primary:'임', secondary:'병', note:'유월 금왕, 임수+병화 균형' },
+      10: { primary:'임', secondary:'병', note:'술월 조토, 임수 우선' },
+      11: { primary:'병', secondary:'무', note:'해월 한냉, 병화 해동 최우선' },
+    },
+    // 임수(壬水) — 바다·큰 강, 무토·경금 필요
+    임: {
+       0: { primary:'무', secondary:'병', note:'자월 수왕, 무토 제수 최우선' },
+       1: { primary:'무', secondary:'병', note:'축월 한냉·수왕, 무토+병화' },
+       2: { primary:'무', secondary:'병', note:'인월 무토 제수, 병화 보조' },
+       3: { primary:'무', secondary:'신', note:'묘월 무토 제수, 신금 보조' },
+       4: { primary:'무', secondary:'병', note:'진월 무토 제수, 병화 보조' },
+       5: { primary:'임', secondary:'경', note:'사월 수기 부족, 경금 생수' },  // 수일간 염조: 동류 강화
+       6: { primary:'경', secondary:'신', note:'오월 극염·수 증발, 경금·신금 생수' },
+       7: { primary:'경', secondary:'신', note:'미월 조열, 경금 생수 우선' },
+       8: { primary:'무', secondary:'갑', note:'신월 경금 생수, 무토 제수, 갑목 보조' },
+       9: { primary:'무', secondary:'갑', note:'유월 금왕 생수, 무토 제수' },
+      10: { primary:'갑', secondary:'병', note:'술월 조토, 갑목 소토, 병화 보조' },
+      11: { primary:'무', secondary:'병', note:'해월 수왕, 무토 제수 최우선' },
+    },
+    // 계수(癸水) — 빗물·이슬, 신금·병화 필요
+    계: {
+       0: { primary:'병', secondary:'신', note:'자월 한냉, 병화 해동, 신금 생수' },
+       1: { primary:'병', secondary:'신', note:'축월 동한, 병화 최우선' },
+       2: { primary:'경', secondary:'신', note:'인월 경금·신금 생수 우선' },
+       3: { primary:'경', secondary:'병', note:'묘월 경금 생수, 병화 보조' },
+       4: { primary:'병', secondary:'경', note:'진월 병화 우선, 경금 보조' },
+       5: { primary:'경', secondary:'신', note:'사월 염조, 경금·신금 생수 최우선' },
+       6: { primary:'경', secondary:'신', note:'오월 극염, 경금·신금 절대 용신' },
+       7: { primary:'경', secondary:'신', note:'미월 조열, 경금 생수 우선' },
+       8: { primary:'경', secondary:'신', note:'신월 경금 생수 우선' },
+       9: { primary:'신', secondary:'경', note:'유월 신금 생수 우선' },
+      10: { primary:'신', secondary:'임', note:'술월 조토, 신금 생수, 임수 보조' },
+      11: { primary:'경', secondary:'병', note:'해월 한냉, 경금 생수, 병화 보조' },
+    },
+  };
+
+  // 천간명 → 조후 오행명 변환 (천간으로 표기된 조후를 오행으로)
+  const CHEONGAN_TO_OHENG = {
+    갑:'목', 을:'목', 병:'화', 정:'화', 무:'토', 기:'토', 경:'금', 신:'금', 임:'수', 계:'수'
+  };
+
+  /**
+   * 조후용신 도출
+   * @param {string} ilgan  일간 천간명 (갑~계)
+   * @param {number} wolBranchIdx  월지 지지 인덱스 (0=자 ~ 11=해)
+   * @returns {{ primary:'오행', secondary:'오행'|null, note:string } | null}
+   */
+  function getJohuYongsin(ilgan, wolBranchIdx) {
+    const tbl = JOHU_TABLE[ilgan];
+    if (!tbl || wolBranchIdx === undefined || wolBranchIdx === null) return null;
+    const entry = tbl[wolBranchIdx];
+    if (!entry) return null;
+    return {
+      primary:   CHEONGAN_TO_OHENG[entry.primary]   || entry.primary,
+      secondary: entry.secondary ? (CHEONGAN_TO_OHENG[entry.secondary] || entry.secondary) : null,
+      note:      entry.note,
+    };
+  }
+
+  // ─── ③ 전왕용신(專旺用神) — 종격(從格) 판별 ────────────────────
+  /**
+   * 종격 여부와 종격 종류를 판별
+   * 한 오행이 원국의 6개 이상(천간+지지 총 8자 중)이거나
+   * 일간 포함 동일 오행이 5개 이상이고 다른 오행이 극히 적으면 종격 의심
+   *
+   * @returns {{ isJong: boolean, type: string|null, jongOh: string|null, reason: string|null }}
+   */
+  function getJeonwang(ilganIdx, dist, sipseong) {
+    const myOhName = OHENG_NAMES[STEM_OHENG_IDX[ilganIdx]];
+    const total    = Object.values(dist).reduce((a, b) => a + b, 0);
+
+    // 전왕격 — 일간 오행이 압도적 (5개 이상, 전체의 60% 이상)
+    const myCount = dist[myOhName] || 0;
+    if (myCount >= 5 && myCount / total >= 0.6) {
+      return {
+        isJong: true,
+        type:   '전왕격(專旺格)',
+        jongOh: myOhName,
+        reason: `${myOhName} 오행이 ${myCount}개(${Math.round(myCount/total*100)}%) — 전왕격. 억제 불가, 순응이 용신.`,
+      };
+    }
+
+    // 종강격(從强格) — 비겁+인성 합계가 압도적 (6개 이상)
+    const biScore  = (sipseong.count['비견'] || 0) + (sipseong.count['겁재'] || 0);
+    const inScore  = (sipseong.count['편인'] || 0) + (sipseong.count['정인'] || 0);
+    if (biScore + inScore >= 5) {
+      return {
+        isJong: true,
+        type:   '종강격(從强格)',
+        jongOh: myOhName,
+        reason: `비겁(${biScore})+인성(${inScore})=${biScore+inScore}개 — 종강격. 비겁·인성이 용신.`,
+      };
+    }
+
+    // 종아격(從兒格) — 식상이 압도적
+    const siksScore = (sipseong.count['식신'] || 0) + (sipseong.count['상관'] || 0);
+    if (siksScore >= 4 && myCount <= 1) {
+      const siksOh = OHENG_NAMES[(STEM_OHENG_IDX[ilganIdx] + 1) % 5];
+      return {
+        isJong: true,
+        type:   '종아격(從兒格)',
+        jongOh: siksOh,
+        reason: `식상(${siksScore}개) 압도적, 일간 약(${myCount}개) — 종아격. 식상·재성이 용신.`,
+      };
+    }
+
+    // 종재격(從財格) — 재성이 압도적
+    const jaeScore = (sipseong.count['편재'] || 0) + (sipseong.count['정재'] || 0);
+    if (jaeScore >= 4 && myCount <= 1) {
+      const jaeOh = OHENG_NAMES[(STEM_OHENG_IDX[ilganIdx] + 2) % 5];
+      return {
+        isJong: true,
+        type:   '종재격(從財格)',
+        jongOh: jaeOh,
+        reason: `재성(${jaeScore}개) 압도적, 일간 약(${myCount}개) — 종재격. 재성·관성이 용신.`,
+      };
+    }
+
+    // 종관격(從官格) — 관성이 압도적
+    const gwanScore = (sipseong.count['편관'] || 0) + (sipseong.count['정관'] || 0);
+    if (gwanScore >= 4 && myCount <= 1) {
+      const gwanOh = OHENG_NAMES[(STEM_OHENG_IDX[ilganIdx] + 3) % 5];
+      return {
+        isJong: true,
+        type:   '종관격(從官格)',
+        jongOh: gwanOh,
+        reason: `관성(${gwanScore}개) 압도적, 일간 약(${myCount}개) — 종관격. 관성이 용신.`,
+      };
+    }
+
+    return { isJong: false, type: null, jongOh: null, reason: null };
+  }
+
   // ─── 용신(用神) 도출 ────────────────────────────────────────────
   /**
    * 신강/신약 + 격국 조합으로 용신·희신·기신을 자동 도출
@@ -96,18 +351,72 @@ const SajuEngine = (() => {
    *   - 관성 과다: 인성(통관)·비겁(방어) 우선
    *   - 교체 여부와 사유를 reason 필드로 반환
    */
-  function getYongsin(shingangLevel, ilganIdx, geokguk, dist) {
+  function getYongsin(shingangLevel, ilganIdx, geokguk, dist, wolBranchIdx, ilgan, sipseong) {
     const oh = OHENG_NAMES; // ['목','화','토','금','수']
-    // 일간 오행 인덱스
     const myOh = STEM_OHENG_IDX[ilganIdx];
-    // 오행 상생 순서: 목→화→토→금→수→목
-    const gen  = (o) => (o + 1) % 5; // 내가 생하는 것(식상 방향)
-    const ctrl = (o) => (o + 2) % 5; // 내가 극하는 것(재성 방향)
-    const kill = (o) => (o + 3) % 5; // 나를 극하는 것(관성 방향)
-    const make = (o) => (o + 4) % 5; // 나를 생하는 것(인성 방향)
+    const gen  = (o) => (o + 1) % 5;
+    const ctrl = (o) => (o + 2) % 5;
+    const kill = (o) => (o + 3) % 5;
+    const make = (o) => (o + 4) % 5;
+    const cnt  = (ohName) => (dist && dist[ohName]) ? dist[ohName] : 0;
 
-    // 오행 개수 (dist가 없을 경우 대비)
-    const cnt = (ohName) => (dist && dist[ohName]) ? dist[ohName] : 0;
+    // ── [전처리] ③ 전왕용신(專旺/종격) 먼저 판별 ────────────────────
+    // 종격이면 억부 로직을 건너뛰고 전왕 용신을 바로 반환
+    if (sipseong) {
+      const jw = getJeonwang(ilganIdx, dist, sipseong);
+      if (jw.isJong) {
+        const { type, jongOh, reason: jwReason } = jw;
+        let yongsin, heesin, gisin;
+
+        if (type === '전왕격(專旺格)' || type === '종강격(從强格)') {
+          // 순응: 일간 오행 + 인성을 용신
+          yongsin = [oh[myOh], oh[make(myOh)]];
+          heesin  = [oh[gen(myOh)]];
+          gisin   = [oh[kill(myOh)], oh[ctrl(myOh)]];
+        } else if (type === '종아격(從兒格)') {
+          const siksOhIdx = gen(myOh);
+          yongsin = [oh[siksOhIdx], oh[gen(siksOhIdx)]]; // 식상·재성
+          heesin  = [oh[myOh]];
+          gisin   = [oh[kill(myOh)], oh[make(myOh)]];
+        } else if (type === '종재격(從財格)') {
+          const jaeOhIdx = ctrl(myOh);
+          yongsin = [oh[jaeOhIdx], oh[kill(myOh)]]; // 재성·관성
+          heesin  = [oh[gen(myOh)]];
+          gisin   = [oh[myOh], oh[make(myOh)]];
+        } else { // 종관격
+          const gwanOhIdx = kill(myOh);
+          yongsin = [oh[gwanOhIdx], oh[make(myOh)]]; // 관성·인성
+          heesin  = [oh[ctrl(myOh)]];
+          gisin   = [oh[myOh], oh[gen(myOh)]];
+        }
+
+        function ohToSs2(t) {
+          const tIdx = OHENG_NAMES.indexOf(t);
+          const rel  = (tIdx - myOh + 5) % 5;
+          return ['비겁(比劫)','식상(食傷)','재성(財星)','관성(官星)','인성(印星)'][rel];
+        }
+        yongsin = [...new Set(yongsin)];
+        gisin   = [...new Set(gisin.filter(o => !yongsin.includes(o)))];
+        heesin  = [...new Set(heesin.filter(o => !yongsin.includes(o) && !gisin.includes(o)))];
+
+        return {
+          yongsin: yongsin.map(o => ({ oh: o, ss: ohToSs2(o) })),
+          heesin:  heesin.map(o  => ({ oh: o, ss: ohToSs2(o) })),
+          gisin:   gisin.map(o   => ({ oh: o, ss: ohToSs2(o) })),
+          reason:  jwReason,
+          jeonwang: jw,
+          logic: [`종격 판별: ${type}`, jwReason,
+                  `용신: ${yongsin.join('·')} / 희신: ${heesin.join('·')} / 기신: ${gisin.join('·')}`],
+        };
+      }
+    }
+
+    // ── [전처리] ① 조후용신 먼저 확인 ──────────────────────────────
+    // 조후가 억부와 충돌하면 조후를 우선하고 reason에 기록
+    const johu = (ilgan && wolBranchIdx !== undefined)
+      ? getJohuYongsin(ilgan, wolBranchIdx) : null;
+    const johuPrimary   = johu?.primary   || null;
+    const johuSecondary = johu?.secondary || null;
 
     // ── [보강 Step 0] 재다(財多) / 관다(官多) 선보정 ──────────────
     // 신강·중화 판정이 났더라도 재성 또는 관성 오행이 3개 이상이면
@@ -191,20 +500,118 @@ const SajuEngine = (() => {
       giwoo   = null;
     }
 
-    // ── [보강 Step 1] 용신 후보 오행이 사주 내 부재(0개)이면 희신과 교체 ──
-    // 뿌리 없는 용신은 힘을 쓰지 못하므로, 사주에 존재하는 오행 쪽으로 조정
-    if (yongsin.length > 1) {
-      const available = yongsin.filter(o => cnt(o) > 0);
-      const absent    = yongsin.filter(o => cnt(o) === 0);
-      if (available.length > 0 && absent.length > 0 && !reason) {
-        // 부재 용신을 희신으로 강등, 현존 용신만 남김
-        reason = `용신 후보 중 ${absent.join('·')}은 사주 내 부재(0개). 현존 오행(${available.join('·')}) 위주로 조정.`;
-        yongsin = available;
-        heesin  = [...new Set([...heesin, ...absent])];
+    // ── [보강 Step 0.5] 조후용신과 억부용신 통합 ─────────────────────
+    // 조후 primary가 억부 용신 목록에 없으면 최우선 삽입
+    // 조후 secondary가 기신이 아니면 희신에 추가
+    let johuApplied = null;
+    if (johuPrimary) {
+      if (!yongsin.includes(johuPrimary) && !gisin.includes(johuPrimary)) {
+        // 조후 primary가 기신이 아닌 경우 용신 최우선 삽입
+        yongsin = [johuPrimary, ...yongsin.filter(o => o !== johuPrimary)];
+        johuApplied = `조후용신 ${johuPrimary}(${johu.note}) 최우선 적용`;
+        if (!reason) reason = johuApplied;
+        else reason = johuApplied + ' / ' + reason;
+      } else if (gisin.includes(johuPrimary)) {
+        // 조후 primary가 기신이면: 조후와 억부 충돌 — 조후 우선, 기신에서 제거
+        gisin = gisin.filter(o => o !== johuPrimary);
+        yongsin = [johuPrimary, ...yongsin.filter(o => o !== johuPrimary)];
+        johuApplied = `조후용신 ${johuPrimary}과 억부기신 충돌 → 조후 우선(${johu.note})`;
+        reason = johuApplied + (reason ? ' / ' + reason : '');
+      }
+      if (johuSecondary && !yongsin.includes(johuSecondary) && !gisin.includes(johuSecondary)
+          && !heesin.includes(johuSecondary)) {
+        heesin = [...new Set([johuSecondary, ...heesin])];
+      }
+    }
+    // 월지(woljiOh)가 극단적인 한열(寒熱)일 때 조후용신 우선
+    // 조후가 억부와 일치하면 그대로, 상충하면 조후를 희신으로 추가
+    // (dist.월지 정보가 없으므로 dist 전체에서 화·수 편중 판단)
+    const fireCount  = cnt('화');
+    const waterCount = cnt('수');
+
+    // 화가 0개이고 수가 많은 한랭(寒冷) 구조 → 화(火) 조후용신 필요
+    if (fireCount === 0 && waterCount >= 2) {
+      if (!yongsin.includes('화')) {
+        // 화가 용신 목록에 없으면 최우선 추가
+        yongsin = ['화', ...yongsin.filter(o => o !== '화')];
+        reason = (reason ? reason + ' / ' : '') +
+          `화(火) 전무·수(水) 과다 — 한랭(寒冷) 구조. 화(火) 조후용신 최우선.`;
       }
     }
 
-    // 십성 이름으로 변환
+    // 수가 0개이고 화가 많은 염조(炎燥) 구조 → 수(水) 조후용신 필요
+    if (waterCount === 0 && fireCount >= 2) {
+      if (!yongsin.includes('수')) {
+        yongsin = ['수', ...yongsin.filter(o => o !== '수')];
+        reason = (reason ? reason + ' / ' : '') +
+          `수(水) 전무·화(火) 과다 — 염조(炎燥) 구조. 수(水) 조후용신 최우선.`;
+      }
+    }
+
+    // ── [보강 Step 2] 작명 관점 — 부재 오행 우선 보충 ───────────────
+    // 핵심 원칙: 사주에 없는 오행(0개)은 "결핍"이므로 작명으로 보충해야 할
+    // 최우선 대상이다. 기존 로직처럼 부재하다는 이유로 용신에서 탈락시키면
+    // 작명의 목적 자체를 역행하게 된다.
+    //
+    // 수정 로직:
+    // ① 용신 후보가 여럿인 경우, 사주에 '없는' 오행이 '있는' 오행보다 우선
+    // ② 단, 기신(忌神) 오행이 부재라면 보충 대상에서 제외
+    // ③ 용신이 1개뿐인 경우 변경하지 않음
+    if (yongsin.length > 1 && !reason) {
+      // 기신 집합
+      const gisinSet = new Set(gisin || []);
+      // 부재 용신 (사주에 0개, 기신 아님)
+      const absentYongsin    = yongsin.filter(o => cnt(o) === 0 && !gisinSet.has(o));
+      // 현존 용신 (사주에 1개 이상)
+      const presentYongsin   = yongsin.filter(o => cnt(o) > 0);
+
+      if (absentYongsin.length > 0 && presentYongsin.length > 0) {
+        // 부재 용신을 앞으로 — 이름으로 채워야 할 오행이 더 중요
+        yongsin = [...absentYongsin, ...presentYongsin];
+        reason = `용신 후보 중 ${absentYongsin.join('·')}이 사주 내 부재(0개) — 작명으로 반드시 보충해야 할 오행. 희신 ${presentYongsin.join('·')}도 병행 활용.`;
+      }
+    }
+
+    // ── [보강 Step 3] 기신이 용신 목록에 혼입됐는지 최종 점검 ─────
+    // (재다·관다 보정 이후 gisin과 yongsin이 겹치는 경우 방지)
+    if (gisin && gisin.length > 0) {
+      const gisinSet = new Set(gisin);
+      const cleaned  = yongsin.filter(o => !gisinSet.has(o));
+      if (cleaned.length > 0 && cleaned.length < yongsin.length) {
+        const removed = yongsin.filter(o => gisinSet.has(o));
+        yongsin = cleaned;
+        reason = (reason ? reason + ' / ' : '') +
+          `기신(${removed.join('·')})이 용신 후보에 혼입되어 제거.`;
+      }
+    }
+
+    // ── [보강 Step 4] 화(火)가 용신인데 수(水)가 희신인 모순 제거 ──
+    // 수극화(水克火) 관계에서, 용신인 화를 수가 꺼뜨리면 희신으로 쓸 수 없다.
+    // 특히 원국에 화가 0개인 극한 상황에서 수는 기신에 가깝다.
+    if (yongsin.includes('화') && heesin.includes('수') && cnt('화') === 0) {
+      heesin = heesin.filter(o => o !== '수');
+      if (!gisin.includes('수')) gisin = [...gisin, '수'];
+      reason = (reason ? reason + ' / ' : '') +
+        `화(火) 용신 + 수(水) 희신 모순 — 수극화(水克火)로 용신을 손상. 수(水)를 기신으로 재분류.`;
+    }
+
+    // ── [보강 Step 5] 목(木)이 화(火) 용신의 희신인 경우 확인 ────────
+    // 목생화(木生火): 목은 화를 생하므로, 화가 용신이면 목은 희신이 맞다.
+    // 단, 신금 일간에서 목은 재성(내가 극하는 것)이므로 신강이면 목도 용신 후보.
+    // 이미 yongsin에 목이 있다면 중복 제거만 처리.
+    if (yongsin.includes('화') && !heesin.includes('목') && !yongsin.includes('목')) {
+      if (!gisin.includes('목')) {
+        heesin = [...new Set([...heesin, '목'])];
+      }
+    }
+
+    // ── 최종 중복 제거 및 교차 오염 정리 ────────────────────────────
+    // 우선순위: 용신 > 기신 > 희신
+    // 같은 오행이 두 집합에 걸치면 높은 우선순위 집합 하나에만 남긴다
+    yongsin = [...new Set(yongsin)];
+    gisin   = [...new Set((gisin  || []).filter(o => !yongsin.includes(o)))];
+    heesin  = [...new Set((heesin || []).filter(o => !yongsin.includes(o) && !gisin.includes(o)))];
+
     function ohToSs(targetOhName) {
       const tIdx = OHENG_NAMES.indexOf(targetOhName);
       const rel  = (tIdx - myOh + 5) % 5;
@@ -216,7 +623,16 @@ const SajuEngine = (() => {
       yongsin: yongsin.map(o => ({ oh: o, ss: ohToSs(o) })),
       heesin:  heesin.map(o  => ({ oh: o, ss: ohToSs(o) })),
       gisin:   gisin.map(o   => ({ oh: o, ss: ohToSs(o) })),
-      reason,   // 교정 사유 (null이면 정상 공식 적용)
+      reason,
+      johu,        // 조후용신 원본 정보
+      jeonwang: { isJong: false }, // 종격 아님
+      logic: [
+        `신강/신약: ${shingangLevel === 'strong' ? '신강' : shingangLevel === 'weak' ? '신약' : '중화'}`,
+        `격국: ${geokguk}`,
+        johu ? `조후: ${johu.note}` : null,
+        reason ? `보정: ${reason}` : null,
+        `용신: ${yongsin.join('·')} / 희신: ${(heesin||[]).join('·')} / 기신: ${(gisin||[]).join('·')}`,
+      ].filter(Boolean),
     };
   }
 
@@ -1207,9 +1623,14 @@ ${ss.detail}<br><br>
       si:   siju ? getTonggeun(siju.stemIdx, pillars) : null,
     };
 
-    // 용신 도출
+    // 용신 도출 — 조후(월지), 일간명, 십성 정보 함께 전달
     const shingang = getShingang(sipseong);
-    const yongsin  = getYongsin(shingang.level, dayStemIdx, geokguk, dist);
+    const yongsin  = getYongsin(
+      shingang.level, dayStemIdx, geokguk, dist,
+      wolju.branchIdx,   // ① 조후용신: 월지 인덱스
+      ilju.gan,          // ① 조후용신: 일간 천간명
+      sipseong           // ③ 전왕용신: 십성 분포
+    );
 
     // 합충형파해 + 신살
     const hapchung = getHapChungHyeong(pillars.map((p, i) => ({ ...p, label: ['연주','월주','일주','시주'][i] })));
