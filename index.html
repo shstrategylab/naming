@@ -1609,6 +1609,7 @@ function renderNames(list, page = 1) {
     const globalIdx = (curPage - 1) * PAGE_SIZE + idx;
     const [e1,e2]  = r.resourceOhaeng.split('·');
     const nameBody = r.name.slice(1);
+    const eumScore     = r.eumOhaeng?.score ?? 0;
     const eumYangScore = r.eumYang?.score ?? 0;
     const eumYangBadge = eumYangScore >= 6
       ? `<span class="eum-badge eum-great">음양◎</span>`
@@ -1766,6 +1767,8 @@ function showDet(idx, e) {
               <span class="scr-val" style="color:${eumYangScore>=6?'var(--good)':eumYangScore>=3?'var(--goldl)':eumYangScore<0?'var(--dim)':'var(--mut)'}">${eumYangScore}점</span>
               <span class="scr-note">${r.eumYang?.comment || '—'}</span>
             </div>
+            <div class="scr-row">
+              <span class="scr-lbl">음령오행 점수</span>
               <span class="scr-val" style="color:${eumScore>=6?'var(--good)':eumScore>=3?'var(--goldl)':'var(--mut)'}">${eumScore}점</span>
               <span class="scr-note">상생+3 / 동기+2 / 상극-3</span>
             </div>
